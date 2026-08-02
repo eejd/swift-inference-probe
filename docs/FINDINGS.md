@@ -25,10 +25,16 @@ see [`TEST_STRATEGY.md`](TEST_STRATEGY.md) §4.4.
 | Xcode | **26.6** (17F113) |
 | macOS SDK | 26.5 |
 | Swift | **6.3.3** (swiftlang-6.3.3.1.3), Swift Testing 1902 |
-| Python | 3.12 (dedicated conda env `inferenceprobe`) |
-| torch | *pending — Day 1* |
-| torchvision | *pending — Day 1* |
-| coremltools | *pending — Day 1* |
+| Python | **3.12.13** (conda env `inferenceprobe`) |
+| torch | **2.13.0** |
+| torchvision | **0.28.0** |
+| coremltools | **9.0** |
+| numpy | **2.5.1** |
+
+Full pin in `python/requirements.txt`. Note **coremltools 9.0 warns that torch
+2.7.0 is the newest version it has been tested against**, so torch 2.13.0 is an
+unvalidated pairing. That is the same coremltools major as issue #2625, but a
+different torch — see F-005 and the reproduction caveats in F-006.
 
 **Comparison target.** coremltools [#2625](https://github.com/apple/coremltools/issues/2625)
 was filed on **M1 Air + M1 Max / macOS 26.1 / coremltools 9.0 / PyTorch 2.7**.
@@ -175,6 +181,89 @@ the scheme explicitly.
 Minor, same session: `-resultBundlePath` **refuses to overwrite** an existing
 bundle. Immaterial on a fresh CI runner, but local re-runs need the path cleared
 first.
+
+---
+
+## F-005 · `ct.convert()` segfaults if a `predict()` has run in the process
+
+**Observed.** Exporting MobileNetV3-Large at fp32 then fp16 in one process died
+with **exit code 139 (SIGSEGV)** during the fp16 conversion. No Python
+traceback — a native crash. The fp32 artifact was written; the fp16 artifact
+never was.
+
+**Bisected.** The crash is not about fp16, and not about converting twice:
+
+| Sequence in one process | Result |
+|---|---|
+| `convert(fp16)` alone | ✅ exit 0 |
+| `convert(fp32)` → `convert(fp16)` | ✅ exit 0 |
+| `convert(fp16)` → `convert(fp32)` | ✅ exit 0 |
+| `convert` → `save` → `convert` → `save` | ✅ exit 0 |
+| `convert` → `save` → `load` → **`predict`** → `convert` | ❌ **exit 139** |
+| `convert(…, skip_model_load=True)` → `save` → `load` → `predict` | ✅ exit 0 |
+
+**Root cause.** `ct.convert()` implicitly loads and compiles the converted model
+before returning. On coremltools 9.0 that implicit load **segfaults if any
+`predict()` has already run in the same process.** Passing
+`skip_model_load=True` suppresses the implicit load and the crash disappears
+entirely.
+
+**Judgement.** A real defect, and an unusually nasty one: it is a hard native
+crash with no traceback, it depends on an interaction between two calls rather
+than on either alone, and the obvious first hypothesis — "fp16 conversion is
+broken" — is wrong. A test suite that exports and then predicts in one process
+would hit this constantly and blame the wrong component.
+
+Attribution is incomplete: coremltools 9.0 declares torch 2.7.0 as its newest
+tested version, and this ran on 2.13.0, so the unvalidated pairing cannot be
+excluded as a contributor. Confirming on torch 2.7.0 is the obvious next step
+before reporting upstream.
+
+**Resolution: worked around** in `python/export_model.py` via
+`skip_model_load=True`, plus an explicit
+`ct.models.MLModel(path, compute_units=CPU_ONLY)` load. The workaround is
+*better than the original code independently of the bug*: the implicit load uses
+`ComputeUnit.ALL`, which is not the deterministic reference path SPEC §2.3
+requires, so the explicit load is what should have been there anyway.
+
+---
+
+## F-006 · fp16 drift reproduces in direction, at ~74% of the reported magnitude
+
+**Preliminary — n = 1.** One synthetic input on one machine. Reported here
+because it is the first measurement, not because it settles anything.
+
+**Measured.** MobileNetV3-Large, ImageNet-normalised random input, seed 0,
+`.cpuOnly`, L1 mean over the 1000 logits:
+
+| Comparison | L1 mean |
+|---|---|
+| Core ML **fp32** vs PyTorch fp32 | **0.000002** (cos 1.000000, top-1 agrees) |
+| PyTorch **fp16** vs PyTorch fp32 — the baseline | **0.006337** |
+| Core ML **fp16** vs PyTorch fp32 | **0.011258** (cos 0.999908, top-1 agrees) |
+| **Core ML fp16 ÷ PyTorch fp16** | **1.78×** |
+
+Issue #2625 reports **0.0394 / 0.0165 = 2.39×**.
+
+**Judgement.** The *direction* reproduces: Core ML's fp16 conversion drifts
+meaningfully more than PyTorch's own fp32→fp16 cast on the same model, which is
+the substance of the report. The *magnitude* does not — 1.78× here against 2.39×
+there, and both absolute figures are roughly 3× smaller than the issue's.
+
+Three differences could each account for that, and this measurement separates
+none of them: **chip** (M4 Pro vs. the M1 Air / M1 Max in the thread, where the
+reporter already claims hardware dependence), **torch** (2.13.0 vs 2.7.0), and
+**input distribution** (normalised random noise vs. presumably real ImageNet
+images — logit magnitudes differ off-distribution, and L1 is not scale-free).
+
+The Core ML **fp32** path is essentially exact (L1 2e-6), which is the useful
+control: it says the conversion itself is faithful and the drift is specifically
+a precision effect, not a broken graph.
+
+**Do not quote the 1.78× as a reproduction.** With n = 1 on synthetic input it
+is a direction, not a magnitude. Making it a real result needs many inputs drawn
+from the actual data distribution, and ideally a torch 2.7.0 arm to eliminate one
+of the three confounds.
 
 ---
 

@@ -57,12 +57,16 @@ pip freeze > python/requirements.txt   # pinning is mandatory — SPEC §5
 suite green. Establishes that every measurement can be stamped with the machine
 that produced it.
 
-### M1 — Export and reference · in progress
+### M1 — Export and reference · ✅ done
 
-Export MobileNetV3-Large to Core ML at **fp32 and fp16**, get a prediction from
-each, record resolved package versions into `FINDINGS.md`. Both precisions
-matter: coremltools defaults to fp16, so the fp32 export is what makes the fp16
-delta attributable (SPEC §2.4).
+`python/export_model.py` exports MobileNetV3-Large to Core ML at **fp32 and
+fp16**, predicts through each on `.cpuOnly`, and writes a per-artifact manifest
+recording resolved versions and host chip. Both precisions matter: coremltools
+defaults to fp16, so the fp32 export is what makes the fp16 delta attributable
+(SPEC §2.4).
+
+Produced two findings: a **SIGSEGV in `ct.convert()`** (F-005, worked around) and
+a first drift measurement (F-006, n=1, preliminary).
 
 ### M2 — The two core experiments
 
