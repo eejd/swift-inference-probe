@@ -267,6 +267,47 @@ of the three confounds.
 
 ---
 
+## F-007 · Compute-unit choice moves the output more than fp16 conversion does
+
+**Preliminary — n = 1**, same synthetic input and caveats as F-006.
+
+**Measured.** MobileNetV3-Large fp16 `.mlpackage`, one input, each compute unit
+compared against the `.cpuOnly` anchor (SPEC §2.3):
+
+| Compute unit | L1 vs `.cpuOnly` | max abs | cosine | top-1 |
+|---|---|---|---|---|
+| `.cpuAndGPU` | 0.00990185 | 0.09765625 | 0.99993448 | agrees |
+| `.cpuAndNE` | 0.01818193 | 0.14453125 | 0.99978100 | agrees |
+| `.all` | 0.01818193 | 0.14453125 | 0.99978100 | agrees |
+
+All four units load and predict successfully. Top-1 is stable across all of them.
+
+**Two things worth stating.**
+
+**1. The ANE-vs-CPU disagreement (0.0182) is larger than the entire fp16
+conversion drift (0.0113 in F-006).** Which compute unit you run on moved this
+model's output *more* than converting it from PyTorch fp32 to Core ML fp16 did.
+That reorders the intuition the project started with: fp16 conversion is the
+famous problem, but on this model the compute path is the bigger term. It is
+also why differential testing across compute units is the higher-value suite —
+it targets the larger effect and needs no external reference.
+
+**2. `.all` is bit-identical to `.cpuAndNE`.** Core ML is dispatching this model
+to the Neural Engine when given a free choice, so `.all` and `.cpuAndNE` are not
+independent test paths *for this model*. That does not make testing both
+redundant — the equality is itself the assertion. If `.all` ever diverges from
+`.cpuAndNE`, dispatch has changed, and that is exactly the compute-plan
+regression TEST_STRATEGY §5.3 is designed to catch. Confirming it against
+`MLComputePlan` op assignments is the M3 task.
+
+**Judgement.** Nothing is broken — this is a characterisation, not a defect. Its
+value is that it sets up the real experiment: the thresholds in TEST_STRATEGY
+§4.3 must sit above run-to-run variance, and this says the ANE gate needs to
+tolerate roughly 2× what the GPU gate does. Both numbers are n=1 and cannot be
+turned into thresholds until the M3 variance study runs.
+
+---
+
 ## Pending investigations
 
 Each resolves to a finding entry, including the negative results — *"could not
