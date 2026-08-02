@@ -18,6 +18,7 @@ code, and update them when a decision changes.
 | `docs/TEST_STRATEGY.md` | What we validate and why; the tolerance policy; risk tiers |
 | `docs/ROADMAP.md` | Build order, environment of record, backlog |
 | `docs/FINDINGS.md` | Every discrepancy found, with a judgement on each |
+| `docs/TESTING_PRIMER.md` | Why ML inference needs different testing tools; the concepts behind the design |
 
 Anything matching `docs/*.private.md`, plus `apple-ml-test-automation-playbook.md`,
 is personal and **gitignored**. Do not commit it, quote it, or copy its contents
