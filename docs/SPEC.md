@@ -89,9 +89,16 @@ Only the last two are real losses. The configuration one is worth naming
 honestly: a `.xctestplan` is a committed artifact that shows up in code review,
 whereas CLI flags hide in YAML.
 
-The repo currently contains `InferenceProbe.xcodeproj` with **zero targets** — an
-empty shell left over from `xcodebuild`'s project template. It is not
-load-bearing and will be regenerated when the demo app is added.
+**No `.xcodeproj` may sit in the package root.** This is a constraint, not a
+preference: `xcodebuild` resolves a project file in preference to
+`Package.swift` and never falls back, so a stray project — even one with zero
+targets — makes every `xcodebuild` invocation fail with an error that blames the
+scheme name instead. An empty template project was removed from this repo for
+exactly that reason; see [`FINDINGS.md`](FINDINGS.md) F-004.
+
+When the demo app is added post-deadline it needs a real project with real
+targets, and the CI invocation must then name that project's scheme explicitly
+rather than the implicit `-Package` one.
 
 ### 2.2 Swift Testing and XCTest coexist, deliberately
 

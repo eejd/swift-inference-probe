@@ -24,7 +24,7 @@ see [`TEST_STRATEGY.md`](TEST_STRATEGY.md) §4.4.
 | macOS | **26.5.2** (build 25F84) |
 | Xcode | **26.6** (17F113) |
 | macOS SDK | 26.5 |
-| Swift | 6.0 (swiftlang-6.0.0.9.10) via CommandLineTools |
+| Swift | **6.3.3** (swiftlang-6.3.3.1.3), Swift Testing 1902 |
 | Python | 3.12 (dedicated conda env `inferenceprobe`) |
 | torch | *pending — Day 1* |
 | torchvision | *pending — Day 1* |
@@ -54,8 +54,21 @@ Xcode platform directory and **absent** from the CommandLineTools SDK.
 **Judgement.** Environment, not product. Worth recording for two reasons: it
 would have blocked every XCTest and `xcodebuild` invocation later in the week,
 and it is precisely the kind of silent environment skew that makes CI results
-non-comparable to local ones. Fix is `sudo xcode-select -s`; `DEVELOPER_DIR`
-works without sudo. **Resolution: pending.**
+non-comparable to local ones.
+
+The skew was not only about `xcodebuild` availability. The two toolchains ship
+**different compilers** — CommandLineTools had Swift **6.0**, Xcode 26.6 has
+**6.3.3** — so before the fix, `swift build` and
+`DEVELOPER_DIR=… xcrun swift build` compiled the same source with different
+versions. That is exactly the class of difference that makes a local green run
+and a red CI run irreconcilable, and it is invisible unless you check.
+
+**Resolution: fixed** 2 Aug via
+`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`. Verified:
+`xcode-select -p` resolves to Xcode, `xcodebuild -version` succeeds with no
+`DEVELOPER_DIR`, `swift --version` reports 6.3.3, and `XCTest.framework` is
+reachable in the active developer directory. All measurements in this document
+are now attributable to a single toolchain.
 
 ---
 
@@ -111,6 +124,57 @@ Usefully, the `.xcresult` also auto-stamps device identity (architecture, model,
 OS build), which corroborates the `HostEnvironment` design in SPEC §4.1, and the
 raw `measurements` arrays mean percentiles are computed in post-processing rather
 than hand-rolled. **Resolution: SPEC §2.1, §4.8 and TEST_STRATEGY §7, §8 updated.**
+
+---
+
+## F-004 · An empty `.xcodeproj` silently shadows `Package.swift`
+
+**Observed.** With `xcode-select` fixed (F-001), `xcodebuild test -scheme
+InferenceProbe-Package` failed:
+
+> `xcodebuild: error: The project named "InferenceProbe" does not contain a
+> scheme named "InferenceProbe-Package".`
+
+The message points at the scheme name. The scheme name was not the problem.
+
+**Measured.** `xcodebuild -list` in the package root reported *"There are no
+targets in project «InferenceProbe». This project contains no schemes"* — so
+`xcodebuild` had resolved the leftover **zero-target `InferenceProbe.xcodeproj`**
+and never looked at `Package.swift` at all. Moving the project bundle out of the
+directory and re-running:
+
+```
+Information about workspace "InferenceProbe":
+    Schemes:
+        InferenceProbe-Package
+** TEST SUCCEEDED **     # 8 test cases, .xcresult readable
+```
+
+**Judgement.** **When a `.xcodeproj` is present in the package root,
+`xcodebuild` uses it and ignores `Package.swift`.** Not a warning — a hard
+failure whose error message misdirects toward the scheme argument. This directly
+threatens the CI design in SPEC §2.1, which depends on `xcodebuild` driving the
+package, and it would have failed on Wednesday with a message that sends you
+hunting the wrong thing.
+
+The methodological point is the more interesting one: **F-003 validated this
+exact mechanism and missed this, because the spike ran in a clean scratchpad
+directory that had no `.xcodeproj`.** The spike environment differed from the
+real environment in the one way that mattered, so a passing experiment certified
+a workflow that then broke in place. That is a test-validity failure of the same
+family the harness exists to catch — a green result answering a slightly
+different question than the one asked. Worth remembering when the compute-unit
+tests start passing on fixtures that are cleaner than real inputs.
+
+**Resolution: fixed** 2 Aug. The empty project bundle is out of the package root
+and untracked; SPEC §2.1 updated to state the constraint rather than call the
+project merely "not load-bearing". When the demo app is added post-deadline it
+needs a real project with targets, and the `xcodebuild` invocation must then name
+the scheme explicitly.
+
+Minor, same session: `-resultBundlePath` **refuses to overwrite** an existing
+bundle. Immaterial on a fresh CI runner, but local re-runs need the path cleared
+first.
 
 ---
 
