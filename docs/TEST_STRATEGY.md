@@ -151,12 +151,21 @@ above the noise floor rather than at a round number**.
 
 | Threshold | Value | Source |
 |---|---|---|
-| fp32 parity `atol` / `rtol` | ⟨measure⟩ | run-to-run variance, `.cpuOnly` |
-| fp16 `l1Mean` max | ⟨measure⟩ | baseline vs. #2625's 0.0394 / 0.0165 |
-| ANE-vs-CPU `cosineSimilarity` min | ⟨measure⟩ | cross-compute-unit spread |
-| top-5 overlap min | ⟨measure⟩ | observed flip rate on the fixture set |
-| ANE residency floor | ⟨measure⟩ | measured plan on a known-good build |
-| Perf regression trigger | 10% over baseline | playbook default; revisit against measured p95 jitter |
+| **Run-to-run noise floor** | **0.0** — all four units bit-identical | F-008, 20 repeats/unit |
+| fp32 parity `atol` | ⟨measure⟩ — observed 2e-6 | F-006, n=1; needs n≫1 |
+| fp16 `l1Mean` max | ⟨measure⟩ — observed 0.0113 | F-006, n=1; needs n≫1 |
+| ANE-vs-CPU `l1Mean` max | **0.030** | F-008 p95 0.0218, max 0.0242 → ~25% headroom |
+| GPU-vs-CPU `l1Mean` max | **0.020** | F-008 p95 0.0124, max 0.0149 → ~35% headroom |
+| ANE-vs-CPU `cosineSimilarity` min | **0.9990** | F-008 min observed 0.999574 |
+| ANE residency floor | ⟨measure⟩ | measured plan on a known-good build — M3 |
+| Perf regression trigger | 10% over baseline | default; revisit against measured p95 jitter |
+
+**The noise floor being exactly zero is what licenses tight thresholds here.**
+Normally a gate must clear measurement jitter before it can detect anything, and
+that jitter sets a floor on sensitivity. With a deterministic runtime there is no
+such floor — the only headroom needed is for legitimate variation across inputs,
+which is why the values above sit just above the observed max rather than
+multiples of it.
 
 "I set the gate from measured variance rather than picking a number" is the
 distinction between a threshold that holds and one that gets widened the first

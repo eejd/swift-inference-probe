@@ -308,6 +308,72 @@ turned into thresholds until the M3 variance study runs.
 
 ---
 
+## F-008 · 1.5% of inputs change top-1 class between CPU and Neural Engine
+
+**n = 200 inputs, 20 repeats for the noise floor.** `python/compute_unit_differential.py`.
+
+### The noise floor is exactly zero
+
+Same input, same compute unit, 20 consecutive predictions:
+
+| Compute unit | Max spread across 20 runs |
+|---|---|
+| `.cpuOnly` | **0** — bit-identical |
+| `.cpuAndGPU` | **0** — bit-identical |
+| `.cpuAndNE` | **0** — bit-identical |
+| `.all` | **0** — bit-identical |
+
+**This contradicts the assumption SPEC §2.3 was built on** — that GPU and ANE
+execution is not bit-reproducible. On this configuration every compute unit is
+perfectly deterministic. SPEC §2.3 has been corrected.
+
+Two consequences, both load-bearing:
+
+1. **All cross-unit disagreement below is systematic, not jitter.** There is no
+   noise term to subtract. The measurement is the effect.
+2. **A differential test cannot flake for numerical reasons.** The flake budget
+   in TEST_STRATEGY §7 has to worry about timeouts and resource contention, but
+   not about float non-determinism. Thresholds can be set tight.
+
+### The differential
+
+200 distinct ImageNet-scaled inputs, each unit against the `.cpuOnly` anchor:
+
+| Unit | L1 mean | L1 p95 | L1 max | cos min | top-1 flips |
+|---|---|---|---|---|---|
+| `.cpuAndGPU` | 0.010203 | 0.012361 | 0.014912 | 0.999826 | **2 / 200 (1.0%)** |
+| `.cpuAndNE` | 0.018858 | 0.021773 | 0.024170 | 0.999574 | **3 / 200 (1.5%)** |
+| `.all` | 0.018858 | 0.021773 | 0.024170 | 0.999574 | 3 / 200 (1.5%) |
+
+**Judgement.** **1.5% of inputs produce a different top-1 class depending on
+whether the model runs on the CPU or the Neural Engine.** Same model file, same
+weights, same input — different answer. On a classifier shipped to a billion
+devices, that is a real behavioural difference, not a rounding detail, and it is
+invisible to any test that only checks "does inference succeed."
+
+The ordering is coherent and expected: GPU diverges from CPU less than ANE does,
+consistent with the Neural Engine using the most aggressive numerics of the
+three. Cosine similarity stays above 0.9995 throughout, so the logit vectors are
+directionally near-identical — the flips are near-ties reordering, not the model
+computing something unrelated. That is the *benign* reading, and it is why top-1
+flip rate and cosine belong in the report together: cosine alone would have said
+"everything is fine."
+
+`.all` remains bit-identical to `.cpuAndNE` across all 200 inputs, confirming
+F-007's inference that Core ML dispatches this model to the Neural Engine given
+a free choice.
+
+Incidental: `.cpuAndNE` ran 200 predictions in 0.06s against `.cpuOnly`'s 0.37s,
+roughly **6× faster**. The accuracy-vs-latency tradeoff is real and measured, and
+it is the actual engineering decision a team would be making here.
+
+**Still to resolve.** These are synthetic inputs. The 1.5% flip rate is a
+property of this input distribution, and near-ties are likely more common on
+random noise than on real photographs. Re-running on real ImageNet samples is
+required before quoting the rate as a general figure.
+
+---
+
 ## Pending investigations
 
 Each resolves to a finding entry, including the negative results — *"could not

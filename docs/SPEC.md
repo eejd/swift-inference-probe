@@ -115,13 +115,27 @@ stay in XCTest. Both frameworks live in the same target.
 | `PerformanceTests` | **XCTest** | `measure(metrics:)` / `XCTMetric` have no Swift Testing equivalent |
 | `ProbeDemoUITests` | **XCTest** | XCUITest only |
 
-### 2.3 `.cpuOnly` is the deterministic reference path
+### 2.3 `.cpuOnly` is the reference anchor
 
-GPU and Neural Engine execution is not bit-reproducible across runs. `.cpuOnly`
-is, near enough to serve as the in-runtime reference. Differential tests are
-therefore anchored: every other compute unit is compared *against `.cpuOnly`*,
-not pairwise-all, which reduces the matrix from O(n²) to O(n) and gives failures
-a single clear referent.
+Differential tests are anchored: every other compute unit is compared *against
+`.cpuOnly`*, not pairwise-all, which reduces the matrix from O(n²) to O(n) and
+gives failures a single clear referent.
+
+**Corrected 2 Aug.** This section originally justified the anchor by claiming
+"GPU and Neural Engine execution is not bit-reproducible across runs." That was
+inherited assumption, and it is **false on this configuration** —
+[`FINDINGS.md`](FINDINGS.md) F-008 measured all four compute units as
+bit-identical across repeated runs of a fixed input.
+
+The anchor is still right, but for a different reason. `.cpuOnly` is the
+*semantically privileged* path — the simplest dispatch, the one least likely to
+change under a Core ML update, and the natural referent for "what should this
+have computed." It is not more deterministic than the others, because none of
+them are non-deterministic.
+
+The consequence is large and load-bearing: with a zero noise floor, **every
+cross-unit difference is systematic**, so thresholds can be tight and a
+differential test cannot flake for numerical reasons.
 
 ### 2.4 fp16 is the default and the reason this project exists
 

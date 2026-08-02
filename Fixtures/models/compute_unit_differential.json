@@ -1,0 +1,64 @@
+{
+  "n_inputs": 200,
+  "repeats": 20,
+  "anchor": "cpuOnly",
+  "noise_floor": {
+    "cpuOnly": {
+      "max_abs_spread": 0.0,
+      "deterministic": true
+    },
+    "cpuAndGPU": {
+      "max_abs_spread": 0.0,
+      "deterministic": true
+    },
+    "cpuAndNE": {
+      "max_abs_spread": 0.0,
+      "deterministic": true
+    },
+    "all": {
+      "max_abs_spread": 0.0,
+      "deterministic": true
+    }
+  },
+  "differential": {
+    "cpuAndGPU": {
+      "l1_mean": {
+        "mean": 0.010203243405818938,
+        "median": 0.010106446027755737,
+        "p95": 0.012360844993591307,
+        "max": 0.014912124633789062
+      },
+      "cosine_min": 0.9998258380898517,
+      "top5_overlap_mean": 0.9880000000000001,
+      "top5_overlap_min": 0.8,
+      "top1_flips": 2,
+      "top1_flip_rate": 0.01
+    },
+    "cpuAndNE": {
+      "l1_mean": {
+        "mean": 0.01885786915838718,
+        "median": 0.018697269439697267,
+        "p95": 0.021773205947875976,
+        "max": 0.024169662475585937
+      },
+      "cosine_min": 0.999573945116162,
+      "top5_overlap_mean": 0.986,
+      "top5_overlap_min": 0.8,
+      "top1_flips": 3,
+      "top1_flip_rate": 0.015
+    },
+    "all": {
+      "l1_mean": {
+        "mean": 0.01885786915838718,
+        "median": 0.018697269439697267,
+        "p95": 0.021773205947875976,
+        "max": 0.024169662475585937
+      },
+      "cosine_min": 0.999573945116162,
+      "top5_overlap_mean": 0.986,
+      "top5_overlap_min": 0.8,
+      "top1_flips": 3,
+      "top1_flip_rate": 0.015
+    }
+  }
+}
