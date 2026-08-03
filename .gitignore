@@ -34,3 +34,6 @@ venv/
 
 # Empty template project (zero targets). Regenerated when the demo app lands.
 InferenceProbe.xcodeproj/
+
+# Second environment's exports — same code path, different torch pin (F-010)
+Fixtures/models-torch27/*.mlpackage/

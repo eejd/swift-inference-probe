@@ -1,0 +1,35 @@
+{
+  "coreml": {
+    "fp32": {
+      "l1_mean": 1.5655085444450378e-06,
+      "max_abs": 9.775161743164062e-06,
+      "cosine_similarity": 0.9999999999983562,
+      "top1_reference": 111,
+      "top1_actual": 111,
+      "top1_agrees": true,
+      "top5_overlap": 1.0,
+      "kl_divergence_nats": 5.984731561208893e-12
+    },
+    "fp16": {
+      "l1_mean": 0.011257951671257616,
+      "max_abs": 0.10882711410522461,
+      "cosine_similarity": 0.9999076463029055,
+      "top1_reference": 111,
+      "top1_actual": 111,
+      "top1_agrees": true,
+      "top5_overlap": 1.0,
+      "kl_divergence_nats": 0.00045430712619943907
+    }
+  },
+  "torch_fp16_baseline": {
+    "l1_mean": 0.006337294990196824,
+    "max_abs": 0.038860440254211426,
+    "cosine_similarity": 0.9999754976726039,
+    "top1_reference": 111,
+    "top1_actual": 111,
+    "top1_agrees": true,
+    "top5_overlap": 1.0,
+    "kl_divergence_nats": 6.655839003552415e-05
+  },
+  "coreml_fp16_over_torch_fp16_l1_ratio": 1.7764600967246382
+}

@@ -214,10 +214,35 @@ than on either alone, and the obvious first hypothesis — "fp16 conversion is
 broken" — is wrong. A test suite that exports and then predicts in one process
 would hit this constantly and blame the wrong component.
 
-Attribution is incomplete: coremltools 9.0 declares torch 2.7.0 as its newest
-tested version, and this ran on 2.13.0, so the unvalidated pairing cannot be
-excluded as a contributor. Confirming on torch 2.7.0 is the obvious next step
-before reporting upstream.
+**Attribution resolved 3 Aug — this is a genuine coremltools defect.** The
+original write-up could not exclude the untested torch 2.13.0 pairing. Re-running
+the identical sequence in a clean env on **torch 2.7.0** — the version
+coremltools 9.0 declares as its newest tested, and the version #2625 was filed
+against — **still crashes**.
+
+The signal differs, and the torch 2.7.0 run is the more informative one:
+
+| Environment | Exit | Signal |
+|---|---|---|
+| torch 2.13.0 | 139 | SIGSEGV — raw memory fault, no message |
+| torch 2.7.0 | 134 | SIGABRT, with a diagnostic |
+
+```
+Fatal Python error: PyEval_SaveThread: the function must be called with the GIL
+held, after Python initialization and before Python finalization, but the GIL is
+released (the current Python thread state is NULL)
+```
+
+**Root cause: GIL mishandling in coremltools' native extension**, not memory
+corruption. Something releases the Global Interpreter Lock and then re-enters a
+path that assumes it is still held. That explains why the bug is an *interaction*
+rather than a property of either call: `predict()` leaves the interpreter's
+thread state in a condition that `convert()`'s implicit model-load path then
+mishandles.
+
+This is now worth reporting upstream, and the report writes itself: exact
+sequence, both signals, the GIL diagnostic, and a five-row bisection table
+showing what does *not* trigger it.
 
 **Resolution: worked around** in `python/export_model.py` via
 `skip_model_load=True`, plus an explicit
@@ -429,6 +454,67 @@ already makes.
 Incidental, consistent with F-008: top-1 flips fell from 4/100 to 2/100 on
 structured inputs, supporting the reading that flips are near-ties reordering and
 that near-ties are more frequent on off-distribution noise.
+
+---
+
+## F-010 · torch version eliminated; hardware is the only remaining explanation
+
+**A second environment**, `inferenceprobe-torch27`, pins **torch 2.7.0 /
+torchvision 0.22.0 / coremltools 9.0** — matching both #2625's configuration and
+coremltools 9.0's declared tested version. The original env is untouched, so the
+two are directly comparable.
+
+**Every number is bit-identical to torch 2.13.0.** Not close — identical to the
+last reported digit, across both input distributions at n = 100 and on the
+single-input export:
+
+| | torch 2.13.0 | torch 2.7.0 |
+|---|---|---|
+| PyTorch fp16 baseline L1 | 0.006337 | 0.006337 |
+| Core ML fp32 L1 (control) | 0.000002 | 0.000002 |
+| Core ML fp16 L1 | 0.011258 | 0.011258 |
+| Core ML fp16 max abs | 0.108827 | 0.108827 |
+| white-noise ratio, n=100 | 1.70× | 1.70× |
+| natural-1/f ratio, n=100 | 1.51× | 1.51× |
+
+**Judgement.** The torch version has **no effect whatsoever** on the exported
+model's numerics here. In hindsight this is the expected result — torch's role
+ends at tracing the graph, and the arithmetic is Core ML's — but "expected" is
+not "verified," and coremltools' own warning made it a live hypothesis worth
+spending twenty minutes on.
+
+### Where the #2625 investigation now stands
+
+F-006 named three candidate explanations for measuring 1.5–1.8× against the
+issue's 2.39×. Two are now closed:
+
+| Confound | Status |
+|---|---|
+| Input distribution | **Eliminated** (F-009) — and it moves the ratio *away* from 2.39× |
+| torch version | **Eliminated** (this finding) — bit-identical results |
+| **Chip / macOS version** | **Remaining. Not testable on this machine.** |
+
+By elimination, the discrepancy is attributable to **hardware or OS**: M4 Pro /
+macOS 26.5.2 here against the M1 Air and M1 Max / macOS 26.1 in the thread.
+
+That is worth stating carefully, because it is the conclusion the issue thread
+already argues for from a different direction: a commenter there reports an M1
+Air showing high numerical error on ops where an M1 Max is fine. This
+investigation reaches the same place independently, by eliminating everything
+else, on a third chip generation.
+
+**This is a stronger result than a clean reproduction would have been.** A
+reproduction would have confirmed a number someone else already published.
+Eliminating two confounds and localising the remaining variance to hardware
+adds information to the thread — and it directly supports the design decision in
+TEST_STRATEGY §4.4 that tolerance must be a function of the host chip, which was
+an inherited assumption until now and is now evidence-backed.
+
+**Caveat.** Elimination is not proof. A fourth unconsidered variable — the
+`.mlpackage` deployment target, the Core ML runtime shipped with macOS 26.5.2
+versus 26.1, or the specific fixture the issue reporter used — could account for
+it. Confirming would need the same script run on an M1, which is the one thing
+this machine cannot provide.
 
 ---
 
