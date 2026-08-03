@@ -374,6 +374,64 @@ required before quoting the rate as a general figure.
 
 ---
 
+## F-009 · Input distribution moves the #2625 ratio, but does not explain the gap
+
+**n = 100 per distribution.** `python/repro_2625.py`.
+
+F-006 measured 1.78× on n=1 with uniform random pixels and flagged input
+distribution as a likely confound: white noise is off-distribution for a network
+trained on photographs, and **L1 is not scale-free**, so if logit magnitudes move
+the L1 moves with them.
+
+This tests that directly by generating a second input set with a **1/f^1.2 power
+spectrum** — the spatial statistic that distinguishes photographs from noise
+(energy concentrated at low frequencies, correlated neighbouring pixels,
+structure at multiple scales), with colour channels sharing a luminance
+component.
+
+| | white noise | natural 1/f | issue #2625 |
+|---|---|---|---|
+| PyTorch fp16 L1 | 0.006923 | 0.008707 | 0.0165 |
+| Core ML fp16 L1 | 0.011749 | 0.013184 | 0.0394 |
+| **Ratio** | **1.70×** | **1.51×** | **2.39×** |
+| Core ML fp32 L1 (control) | 0.000002 | 0.000002 | — |
+| mean logit \|max\| | 5.38 | 6.52 | — |
+| top-1 flips | 4/100 | 2/100 | — |
+
+**The manipulation worked.** Mean logit magnitude moved from 5.38 to 6.52, so the
+two input sets genuinely put the network at different operating points — this was
+a real test, not a null manipulation. Absolute L1 rose for both PyTorch and
+Core ML, consistent with L1 tracking output scale.
+
+**But it does not explain the gap, and it argues against the hypothesis.** The
+ratio moved from 1.70× to 1.51× — *away* from the reported 2.39×, not toward it.
+If more photograph-like inputs lower the ratio, real photographs would be
+expected to lower it further. Input distribution is therefore eliminated as the
+explanation for the discrepancy with #2625, and eliminated in the stronger
+direction: it makes the disagreement worse.
+
+Both absolute figures also remain roughly 2–3× below the issue's (0.0132 vs
+0.0394; 0.0087 vs 0.0165), so the difference is not a rescaling of one number —
+the whole measurement sits lower here.
+
+**The fp32 control held at 0.000002 under both distributions**, which is what
+makes the above interpretable: the conversion is faithful regardless of input, so
+everything observed is a precision effect rather than a graph defect.
+
+**Judgement.** A useful negative result. Of the three confounds F-006 named —
+chip, torch version, input distribution — the third is now ruled out. **Chip and
+torch version remain**, and only one of those is testable on this machine. A
+torch 2.7.0 environment (matching both #2625 and coremltools 9.0's declared
+tested version) is the next elimination; if the ratio still sits near 1.5×, the
+remaining explanation is hardware, which is precisely the claim the issue thread
+already makes.
+
+Incidental, consistent with F-008: top-1 flips fell from 4/100 to 2/100 on
+structured inputs, supporting the reading that flips are near-ties reordering and
+that near-ties are more frequent on off-distribution noise.
+
+---
+
 ## Pending investigations
 
 Each resolves to a finding entry, including the negative results — *"could not
