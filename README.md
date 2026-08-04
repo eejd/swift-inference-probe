@@ -91,10 +91,15 @@ python compute_unit_differential.py && python repro_2625.py
 git -C /Users/weihantu/InferenceProbe diff --stat Fixtures/    # expect: no output
 ```
 
-`export_model.py` is the exception — it stamps `exported_at`, so re-running it
-always dirties the two manifest files even when every number is identical. Run
-it only when you actually need to regenerate the `.mlpackage` files, which are
-gitignored and therefore mandatory on a fresh clone before anything else works.
+**Two scripts are exceptions, both because they stamp a timestamp:**
+
+- `export_model.py` writes `exported_at`, so re-running always dirties the two
+  manifest files even when every weight is identical. Run it only to regenerate
+  the `.mlpackage` files — gitignored, and therefore mandatory on a fresh clone
+  before anything else works.
+- `generate_goldens.py` writes `blessedAt`, so re-running dirties the golden
+  manifests. The tensors themselves are unchanged. Re-run it only when you mean
+  to re-bless, and pass `--reason` saying why — that is the point of the field.
 
 Use `conda deactivate` when finished. `inferenceprobe-torch27` is an isolated
 comparison environment for finding F-010 and is not the normal development

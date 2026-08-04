@@ -255,9 +255,144 @@ reporter's own fixture — could still account for it. That caveat belongs in th
 finding rather than smoothed out of it, because a conclusion by elimination is
 only ever as strong as the list of alternatives somebody thought to write down.
 
+### Step 8 — An answer that moves with a parameter is not yet an answer
+
+Once a test fails, the next question is *which layer*. Apple ships a tool for
+exactly that: `MLModelComparator` walks the graph and reports the op responsible.
+
+Run it once and you get a layer name, which feels like an answer. Run it across
+tolerances and the name changes (F-012):
+
+| `atol` | blamed op |
+|---|---|
+| 1e-6 … 1e-4 | `conv:input_3`, `conv:input_67` |
+| 1e-3 … 1e-2 | `conv:input_3` |
+| 1e-1 | **`linear:var_930`** |
+| 1e0 | *(nothing)* |
+
+Same model, same input, one parameter changed — and the blame moves from the
+first convolution to the last linear layer. Neither answer is wrong, which is
+the uncomfortable part.
+
+**The mechanism explains it.** `find_failing_ops` walks *backward* from the
+outputs and reports an op that fails while its own inputs pass. So the tolerance
+decides how far back the walk gets. `conv:input_3` is op 1 of 182 and
+`linear:var_930` is op 182 of 182: a loose tolerance stops at the output layer,
+a strict one reaches the origin. Wall clock is the giveaway — 62 seconds at
+`atol` 1e-3 against **0.7 seconds** at 0.1, because the search terminates
+immediately.
+
+Two things generalise:
+
+- **Report the sweep, not the point.** A localization result without the
+  tolerance that produced it is not a finding; it is one sample of a curve.
+- **"Stabilizes" needs an operational definition.** Here it is *the answer stops
+  changing*: the widest run of consecutive tolerances giving an identical op
+  set. Not "the count is small" — a confidently wrong single answer also has a
+  small count.
+
+### Step 9 — Ask whether your detector can fire at all
+
+The next task was Apple's NaN/Inf scanner, behind the rule *"NaN or Inf in the
+output is an unconditional failure, no tolerance debate."* Run it on a normal
+input: **zero failing ops, 0.4 seconds.** That looks like a pass.
+
+It is not a pass. A detector that never fires and a model that never breaks
+produce identical reports. So before believing the clean result, feed it
+something that *should* trip it.
+
+This is a **positive control**, and it is the mirror image of the manipulation
+check in §4.5. A manipulation check asks *did my experiment change anything?* A
+positive control asks *can my instrument detect anything?* Both defend against
+the same failure — a null result that means nothing.
+
+The control was an all-NaN input, and PyTorch was the reference (F-013):
+
+| Input | PyTorch fp32 | Core ML |
+|---|---|---|
+| all NaN | **1000 NaNs** | finite, **top-1 = 904** |
+| all +Inf | **1000 NaNs** | finite, top-1 = 904, *identical to above* |
+| 100 NaNs in 150k values | **1000 NaNs** | finite, **top-1 = 111 — same as nominal** |
+
+PyTorch poisons the output, as IEEE arithmetic requires. Core ML returns a
+confident, plausible answer. Across 56 configurations the NaN scan **never fired
+once**; the Inf scan fired twice, in one corner of the matrix.
+
+So the gate is a sound *sufficient* condition and a nearly useless *necessary*
+one, and the real failure mode is worse than a crash: **silent saturation to a
+finite wrong answer**. A pipeline bug that feeds garbage to this model in
+production gets a class prediction back, not an error.
+
+**Then chase it into the other language.** The finding had an obvious hole —
+maybe the Python wrapper was cleaning the input, in which case a shipped app
+would behave differently. Driving the same tensors through Swift, which touches
+the framework directly, returned *identical* values: top-1 904, |max| 6.592
+(F-015). The wrapper was exonerated and the behaviour is the runtime's, which is
+the answer that actually matters. **A finding is not finished while a plausible
+alternative explanation is still standing** — §4.5 again, applied to a defect
+rather than a null result.
+
+### Step 10 — Read the mechanism instead of inferring it
+
+Earlier work noticed that `.all` and `.cpuAndNE` produced bit-identical output
+across 200 inputs and concluded Core ML must be dispatching to the Neural
+Engine. Reasonable — and still an inference from behaviour.
+
+`MLComputePlan` reports the assignment directly, before anything runs (F-014):
+
+| Model | `.cpuOnly` | `.cpuAndGPU` | `.cpuAndNE` | `.all` |
+|---|---|---|---|---|
+| **fp16** | 100% CPU | 100% GPU | **100% ANE** | **100% ANE** |
+| **fp32** | 100% CPU | 100% GPU | **100% CPU** | **100% GPU** |
+
+The fp16 plans for `.all` and `.cpuAndNE` are *the same plan*. So those were
+never two paths that happened to agree — which is a stronger statement than the
+inference, and it means the differential between them is really asserting *that
+dispatch has not changed*.
+
+It also answered a question that had been left dangling: an fp32 model under
+`.cpuAndNE` compiles to a pure-CPU plan, because **no fp32 op can reach the
+Neural Engine at all**. A parity suite running fp32 under `.cpuAndNE` is
+silently testing the CPU twice.
+
+**Where a direct measurement exists, prefer it to a behavioural inference** —
+not because the inference was wrong, but because the direct reading answers
+questions the inference cannot.
+
+*And a warning about direct readings.* `supported_compute_devices` reports what
+is available **under the configuration you asked for**, not a property of the
+op. Under `.cpuOnly` no op lists the Neural Engine — trivially true, and
+meaningless. The first version of that script duly reported "9 op types are not
+ANE-capable" for every CPU and GPU row, which reads exactly like a finding and
+is an artifact of asking a question that configuration cannot answer. **An API
+that always returns something will happily answer a question you should not have
+asked.**
+
+### Step 11 — Put the findings where they cannot be ignored
+
+A finding in a document gets read once. The last step is moving each one into a
+place that enforces it.
+
+- Thresholds in the Swift suite are **quoted from the measurement**: the ANE
+  gate is 0.030 because F-008 observed a maximum of 0.0242, and the policy's
+  `rationale` field says so in the source.
+- `rationale` is **non-optional**. A tolerance policy cannot be constructed
+  without stating why those numbers — documentation as a property of the type
+  system rather than a review convention.
+- Re-blessing a golden **requires a reason**, and the previous reason is carried
+  forward rather than overwritten. A golden re-blessed three times says so.
+- The most useful one is a test that was deliberately *not* written. fp16 parity
+  against PyTorch does **not** assert top-1, because F-009 measured 2–4% top-1
+  flips — a top-1 gate there would fail on 2–4% of inputs by construction. That
+  is a flake manufactured on purpose. Top-1 is asserted where it actually holds,
+  across compute units.
+
+**Knowing which assertion not to write is the same skill as knowing which one to
+write**, and it is only available to someone who measured first.
+
 ---
 
-## 4. Six lessons that generalise
+## 4. Eight lessons that generalise
 
 ### 4.1 Choosing the metric *is* the test design
 
@@ -338,6 +473,49 @@ root-caused a crash open since Step 4.
 Cheap eliminations are worth running even when you are confident of the outcome.
 Confidence is not a measurement, and the byproducts are frequently the point.
 
+### 4.7 "Reproducible", "deterministic" and "portable" are three different claims
+
+They get used interchangeably and they fail independently.
+
+An accidental re-export two days later reproduced every weight and every
+measurement **byte for byte** — but the `.mlpackage` around them did not, because
+it carries fresh UUIDs and an embedded date stamp on every export (F-011). The
+compute plan shows the same split: device assignment is bit-stable across loads
+while the estimated cost weights wobble in the last ulp (F-014).
+
+The pattern is worth naming: **the load-bearing part is reproducible, an
+incidental float or identifier beside it is not.** It has a direct consequence
+for snapshot tests — a golden keyed on a digest of the whole artifact would
+invalidate on every export while the numerics were untouched, and the failure
+would look exactly like a real model change. So golden identity here is a digest
+of the *weights*, never of the package.
+
+And none of that is **portability**. Everything above holds on one machine with
+one seed. Whether another chip produces the same weights is a different question
+— the one the #2625 investigation could not close.
+
+### 4.8 Regenerating is not reproducing
+
+The Python experiments build their inputs from a seed, which is reproducible and
+costs nothing to store. The obvious move is to do the same in Swift.
+
+It does not work. `torch.rand` with seed 0 is a specific generator; Swift's is a
+different one. Two "identical seeded random inputs" are entirely different
+tensors, and any elementwise comparison against a PyTorch reference computed on
+the other one is meaningless.
+
+The tell was in F-015. The malformed inputs — all-NaN, all-Inf — matched across
+languages to the digit, because *those are the same tensor however you generate
+them*. The nominal inputs did not, and could not.
+
+So the cross-language fixtures are **committed bytes**, not a seed: four inputs
+and their references, 2.3 MB, read by both sides and verified against a digest
+on load. Volume stays where it is cheap — the Python side runs n=100 to n=200 —
+because these fixtures exist for *exactness*, not for coverage.
+
+**Whenever a contract crosses a boundary — two languages, two machines, two
+teams — the artifact is the contract, and a recipe for regenerating it is not.**
+
 ---
 
 ## 5. Vocabulary
@@ -353,7 +531,12 @@ Confidence is not a measurement, and the byproducts are frequently the point.
 | **Control** | A variant included to isolate one variable — here, the fp32 export |
 | **Confound** | An alternative explanation for a result that the experiment cannot rule out |
 | **Manipulation check** | Evidence that the variable you meant to change actually changed |
+| **Positive control** | Evidence that your *detector* can fire — the mirror of a manipulation check |
 | **Elimination** | Localising a cause by closing every alternative you can name |
+| **Localization** | Attributing a failure to a specific op or layer; here, a function of the tolerance passed |
+| **Reproducible** | Same inputs, same code, same machine → same bytes |
+| **Portable** | Same inputs, same code, *different* machine → same bytes. A strictly stronger claim |
+| **Silent saturation** | Failing to a finite, confident, wrong answer instead of to NaN or a crash |
 | **Flake** | A test that both passes and fails on identical input |
 | **Quarantine** | Keeping a known-bad test running and reporting without failing the build |
 | **Test validity** | Whether a test measures what it claims to measure |

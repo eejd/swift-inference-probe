@@ -86,7 +86,11 @@ def write_tensor(path: Path, array: np.ndarray) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--count", type=int, default=4,
+    # 2 per distribution is what is committed, so the bare command reproduces
+    # the tracked state rather than adding to it. Volume lives in the Python
+    # experiments, where n=100-200 costs nothing; these fixtures exist for
+    # cross-language *exactness* (F-015), which needs precision not quantity.
+    ap.add_argument("--count", type=int, default=2,
                     help="inputs per distribution (each is ~590 KB on disk)")
     ap.add_argument("--reason", default="initial baseline",
                     help="why these goldens are being written — recorded in the manifest")

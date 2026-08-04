@@ -143,10 +143,14 @@ tracked**, unlike the models: it cannot be regenerated identically in Swift
 graph; `--arm compute --atols 1e-2` is the smoke-test form. All of them accept
 `--out` to avoid overwriting the committed fixtures.
 
-All except `export_model.py` write no timestamps, so re-running them should
-reproduce the committed JSON byte-for-byte and `git diff Fixtures/` is the
-check (F-011). `export_model.py` stamps `exported_at` and will always dirty the
-manifests, so run it only to regenerate the gitignored `.mlpackage` files.
+The three measurement scripts (`compute_unit_differential.py`, `repro_2625.py`,
+`localize.py`, plus `validate.py` and `compute_plan.py`) write no timestamps, so
+re-running should reproduce the committed JSON byte-for-byte and
+`git diff Fixtures/` is the check (F-011). **Two scripts are exceptions:**
+`export_model.py` stamps `exported_at` and `generate_goldens.py` stamps
+`blessedAt`, so both always dirty their manifests. Run the first only to
+regenerate the gitignored `.mlpackage` files, and the second only when you mean
+to re-bless — with `--reason`.
 
 Run `pip freeze > requirements.txt` from `python/` after any intentional primary
 environment dependency change, because the coremltools debugging utilities are
