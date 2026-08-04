@@ -107,8 +107,9 @@ top-1 on 3/200 synthetic inputs (F-008).
 
 ### M3 — Localization and variance · ⏳ partial
 
-- ⏳ `MLModelComparator` op localization **swept across `atol`**, to find where
-  the answer stabilizes (`TEST_STRATEGY.md` §4.5).
+- ✅ `MLModelComparator` op localization **swept across `atol`**: two plateaus
+  per arm, both agreeing on `conv:input_3` over `atol` 1e-3–1e-2, with the
+  tolerance shown to control the search depth that produces the answer (F-012).
 - ⏳ `MLComputePlan` → ANE residency, setting the §5.3 threshold.
 - ✅ **Run-to-run variance on a fixed input**, per compute unit: zero maximum
   spread across 20 repeats for all four units (F-008).

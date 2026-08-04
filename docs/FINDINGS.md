@@ -3,12 +3,13 @@
 Every real discrepancy the harness caught, with the layer, the magnitude, the
 compute path, and a judgement on whether it is acceptable.
 
-**As of 4 Aug 2026 the repository has eleven findings.** F-001–F-004 establish
+**As of 4 Aug 2026 the repository has twelve findings.** F-001–F-004 establish
 the toolchain and runner, F-005 isolates a coremltools native crash, F-006–F-010
-record the fp16 and compute-unit experiments, and F-011 establishes that those
-experiments reproduce byte-for-byte from a fresh export. The reusable Swift
-validation harness is still largely unimplemented, but the Python experiments
-run and their result JSON is committed.
+record the fp16 and compute-unit experiments, F-011 establishes that those
+experiments reproduce byte-for-byte from a fresh export, and F-012 localizes
+both the precision and compute-unit divergence to a specific op. The reusable
+Swift validation harness is still largely unimplemented, but the Python
+experiments run and their result JSON is committed.
 
 Entry format: what was observed · how it was measured · **judgement**. A finding
 without a judgement is an observation, not a finding.
@@ -581,6 +582,97 @@ they are invoked from. The stray tree was verified redundant and removed.
 
 ---
 
+## F-012 · Op localization is a function of `atol`, and the mechanism is search depth
+
+**n = 1 input, 7 tolerances, 2 comparison arms.** `python/localize.py`, output in
+`Fixtures/models/op_localization.json`.
+
+TEST_STRATEGY §4.5 predicted the shape — everything flagged at very low `atol`,
+nothing at very high, a plateau between — on the strength of the #2625
+reporter's observation that `MLModelComparator` blames ordinary `linear`/`conv`
+layers depending on the tolerance passed. Both the shape and the reporter's
+observation reproduce, and the sweep also explains *why*.
+
+**Measured.** MobileNetV3-Large, 718 ops (182 non-const), one seeded
+ImageNet-scaled input, `rtol` pinned to 0 so only `atol` varies:
+
+| `atol` | precision arm (fp32 vs fp16) | compute arm (`.cpuOnly` vs `.cpuAndNE`) |
+|---|---|---|
+| 1e-6 | `conv:input_3`, `conv:input_67` | `conv:input_3`, `conv:input_67` |
+| 1e-5 | `conv:input_3`, `conv:input_67` | `conv:input_3`, `sigmoid_hard:scale_1` |
+| 1e-4 | `conv:input_3`, `conv:input_67` | `conv:input_3`, `sigmoid_hard:scale_1` |
+| 1e-3 | `conv:input_3` | `conv:input_3` |
+| 1e-2 | `conv:input_3` | `conv:input_3` |
+| 1e-1 | **`linear:var_930`** | **`linear:var_930`** |
+| 1e0 | *(none)* | *(none)* |
+
+**The reporter's observation, reproduced exactly.** Same model, same input, one
+parameter changed: at `atol` 0.1 the tool blames a `linear`; at `atol` ≤ 0.01 it
+blames a `conv`. Neither answer is wrong.
+
+**The mechanism.** `find_failing_ops` walks backward from the model outputs and
+reports an op as a failure *source* when it fails comparison while its own
+inputs pass. So the tolerance decides how far back the walk gets. Op positions
+confirm it: `conv:input_3` is non-const op **1 of 182** — the stem convolution —
+and `linear:var_930` is op **182 of 182**, the classifier head. At a loose
+tolerance only the final accumulation of error is large enough to fail, the
+search stops immediately, and the last layer takes the blame. At a strict
+tolerance the failure reaches all the way back, and the search descends to the
+origin.
+
+Wall-clock is the decisive corroboration, since search depth is exactly what
+costs time:
+
+| `atol` | 1e-6 | 1e-5 | 1e-4 | 1e-3 | 1e-2 | 1e-1 | 1e0 |
+|---|---|---|---|---|---|---|---|
+| precision arm | 63.5s | 62.9s | 62.5s | 62.4s | 52.8s | **0.7s** | 0.3s |
+| compute arm | 104.4s | 103.8s | 103.1s | 100.2s | 86.7s | **1.2s** | 0.6s |
+
+The two-orders-of-magnitude collapse at `atol` 0.1 is the search terminating at
+the output layer instead of traversing the graph. **`MLModelComparator` is not
+misbehaving; it is answering a different question at each tolerance.**
+
+**Where it stabilizes.** Two plateaus per arm, not one:
+
+| Arm | strict plateau | loose plateau | most persistent op |
+|---|---|---|---|
+| precision | 1e-6…1e-4 → `input_3`, `input_67` | 1e-3…1e-2 → `input_3` | `conv:input_3`, **5/7** points |
+| compute | 1e-5…1e-4 → `input_3`, `sigmoid_hard` | 1e-3…1e-2 → `input_3` | `conv:input_3`, **5/7** points |
+
+**Judgement.** Three things, in ascending order of usefulness.
+
+**1. The operating point is `atol` 1e-3 to 1e-2.** Both arms plateau there, both
+plateaus name the same single op, and it is the only region where the two
+independent comparisons agree exactly. Below it the answer picks up a second op
+that differs by arm; above it the answer degenerates to "the last layer".
+
+**2. Both effects originate at the same place.** fp16 conversion error and
+CPU-vs-ANE disagreement both localize to `conv:input_3`, the stem convolution,
+at 5 of 7 tolerances in each arm. These are different physical causes — reduced
+mantissa versus a different execution engine — and they surface at the same op,
+which is what a first layer operating on raw normalised input would be expected
+to do. The one asymmetry is real and specific: `sigmoid_hard` appears only in
+the compute arm, so the Neural Engine's divergence involves an activation that
+fp16 conversion alone does not stress.
+
+**3. CLAUDE.md's warning is now demonstrated rather than asserted.** "Localization
+results are meaningless without the `atol` that produced them" was inherited
+from the issue thread. It is now this repository's own measurement, with the
+mechanism identified, and it generalises past this tool: any localizer that
+propagates a pass/fail predicate through a graph has its answer set by the
+predicate's threshold.
+
+**Caveats, and the second is the one that matters.** `rtol` is pinned to 0, so
+the sweep says nothing about relative-tolerance behaviour, where the threshold
+would scale with activation magnitude. More importantly this is **n = 1** — one
+input, one model. Every figure above could be a property of this input rather
+than of the network, and F-008 already showed that per-input behaviour varies
+(3/200 inputs flipped top-1). Repeating the sweep across a set of inputs and
+reporting how often `conv:input_3` survives is the next step before any of this
+is quoted as a general result.
+
+---
+
 ## Investigation status
 
 Each investigation resolves to a finding entry, including negative results.
@@ -591,7 +683,7 @@ finding, especially when the upstream report claims hardware dependence.
 |---|---|---|
 | 1 | Does #2625's fp16 L1 drift (0.0394 vs. 0.0165) reproduce on M4 Pro / macOS 26.5.2? | **Characterized** — direction yes, magnitude no; two confounds eliminated (F-006, F-009, F-010) |
 | 2 | What fraction of inputs disagree between `.cpuOnly` and `.cpuAndNeuralEngine`, and by how much? | **Complete** — 3/200 top-1 flips on synthetic inputs, with the full distribution in F-008 |
-| 3 | Where does `MLModelComparator` op localization stabilize under an `atol` sweep? | **Pending** |
+| 3 | Where does `MLModelComparator` op localization stabilize under an `atol` sweep? | **Complete** — two plateaus per arm; both arms agree on `conv:input_3` over `atol` 1e-3–1e-2, and the tolerance is shown to control search depth (F-012) |
 | 4 | Run-to-run variance on a fixed input, per compute unit | **Complete** — zero maximum spread across 20 repeats/unit (F-008) |
 | 5 | What ANE residency does MobileNetV3-Large actually achieve? | **Pending** |
 | 6 | Any NaN/Inf-producing ops via `MLModelValidator`? | **Pending** |

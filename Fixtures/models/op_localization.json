@@ -1,0 +1,273 @@
+{
+  "seed": 0,
+  "atols": [
+    1e-06,
+    1e-05,
+    0.0001,
+    0.001,
+    0.01,
+    0.1,
+    1.0
+  ],
+  "rtol": 0.0,
+  "arms": {
+    "precision_fp32_vs_fp16": {
+      "description": "Core ML fp32 vs fp16, both .cpuOnly \u2014 where fp16 conversion first shows",
+      "sweep": [
+        {
+          "atol": 1e-06,
+          "failing_op_count": 2,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3",
+            "conv:input_67"
+          ],
+          "seconds": 63.55
+        },
+        {
+          "atol": 1e-05,
+          "failing_op_count": 2,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3",
+            "conv:input_67"
+          ],
+          "seconds": 62.86
+        },
+        {
+          "atol": 0.0001,
+          "failing_op_count": 2,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3",
+            "conv:input_67"
+          ],
+          "seconds": 62.52
+        },
+        {
+          "atol": 0.001,
+          "failing_op_count": 1,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3"
+          ],
+          "seconds": 62.39
+        },
+        {
+          "atol": 0.01,
+          "failing_op_count": 1,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3"
+          ],
+          "seconds": 52.79
+        },
+        {
+          "atol": 0.1,
+          "failing_op_count": 1,
+          "failing_op_types": [
+            "linear"
+          ],
+          "failing_ops": [
+            "linear:var_930"
+          ],
+          "seconds": 0.68
+        },
+        {
+          "atol": 1.0,
+          "failing_op_count": 0,
+          "failing_op_types": [],
+          "failing_ops": [],
+          "seconds": 0.33
+        }
+      ],
+      "plateaus": [
+        {
+          "length": 3,
+          "atol_low": 1e-06,
+          "atol_high": 0.0001,
+          "failing_op_count": 2,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3",
+            "conv:input_67"
+          ]
+        },
+        {
+          "length": 2,
+          "atol_low": 0.001,
+          "atol_high": 0.01,
+          "failing_op_count": 1,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3"
+          ]
+        }
+      ],
+      "op_persistence": [
+        {
+          "op": "conv:input_3",
+          "points": 5,
+          "of": 7
+        },
+        {
+          "op": "conv:input_67",
+          "points": 3,
+          "of": 7
+        },
+        {
+          "op": "linear:var_930",
+          "points": 1,
+          "of": 7
+        }
+      ]
+    },
+    "compute_cpu_vs_ane": {
+      "description": "fp16 .cpuOnly vs .cpuAndNE \u2014 where CPU and Neural Engine first disagree",
+      "sweep": [
+        {
+          "atol": 1e-06,
+          "failing_op_count": 2,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3_cast_fp16",
+            "conv:input_67_cast_fp16"
+          ],
+          "seconds": 104.42
+        },
+        {
+          "atol": 1e-05,
+          "failing_op_count": 2,
+          "failing_op_types": [
+            "conv",
+            "sigmoid_hard"
+          ],
+          "failing_ops": [
+            "conv:input_3_cast_fp16",
+            "sigmoid_hard:scale_1_cast_fp16"
+          ],
+          "seconds": 103.77
+        },
+        {
+          "atol": 0.0001,
+          "failing_op_count": 2,
+          "failing_op_types": [
+            "conv",
+            "sigmoid_hard"
+          ],
+          "failing_ops": [
+            "conv:input_3_cast_fp16",
+            "sigmoid_hard:scale_1_cast_fp16"
+          ],
+          "seconds": 103.13
+        },
+        {
+          "atol": 0.001,
+          "failing_op_count": 1,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3_cast_fp16"
+          ],
+          "seconds": 100.21
+        },
+        {
+          "atol": 0.01,
+          "failing_op_count": 1,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3_cast_fp16"
+          ],
+          "seconds": 86.71
+        },
+        {
+          "atol": 0.1,
+          "failing_op_count": 1,
+          "failing_op_types": [
+            "linear"
+          ],
+          "failing_ops": [
+            "linear:var_930"
+          ],
+          "seconds": 1.16
+        },
+        {
+          "atol": 1.0,
+          "failing_op_count": 0,
+          "failing_op_types": [],
+          "failing_ops": [],
+          "seconds": 0.55
+        }
+      ],
+      "plateaus": [
+        {
+          "length": 2,
+          "atol_low": 1e-05,
+          "atol_high": 0.0001,
+          "failing_op_count": 2,
+          "failing_op_types": [
+            "conv",
+            "sigmoid_hard"
+          ],
+          "failing_ops": [
+            "conv:input_3_cast_fp16",
+            "sigmoid_hard:scale_1_cast_fp16"
+          ]
+        },
+        {
+          "length": 2,
+          "atol_low": 0.001,
+          "atol_high": 0.01,
+          "failing_op_count": 1,
+          "failing_op_types": [
+            "conv"
+          ],
+          "failing_ops": [
+            "conv:input_3_cast_fp16"
+          ]
+        }
+      ],
+      "op_persistence": [
+        {
+          "op": "conv:input_3_cast_fp16",
+          "points": 5,
+          "of": 7
+        },
+        {
+          "op": "sigmoid_hard:scale_1_cast_fp16",
+          "points": 2,
+          "of": 7
+        },
+        {
+          "op": "conv:input_67_cast_fp16",
+          "points": 1,
+          "of": 7
+        },
+        {
+          "op": "linear:var_930",
+          "points": 1,
+          "of": 7
+        }
+      ]
+    }
+  }
+}

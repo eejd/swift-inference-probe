@@ -422,7 +422,7 @@ localization, because Apple's debugging utilities are Python-only.
 | `compute_unit_differential.py` | Repeat-run noise floor and all compute units against `.cpuOnly` | Implemented |
 | `repro_2625.py` | fp16 drift across controlled synthetic input distributions | Implemented |
 | `generate_goldens.py` | PyTorch reference outputs + committed input fixtures | Planned, M4 |
-| `localize.py` | `MLModelComparator` op localization, swept across `atol` | Pending, M3 |
+| `localize.py` | `MLModelComparator` op localization, swept across `atol` | Implemented |
 | `validate.py` | `MLModelValidator.find_failing_ops_with_nan_output()` / `_infinite_output()` | Pending, M3 |
 | `bench.py` | `MLModelBenchmarker.benchmark_load()` / `.benchmark_predict(warmup=True)` / `.benchmark_operation_execution()` | Planned |
 
@@ -450,9 +450,11 @@ Tracked here rather than guessed at; each is resolved by a measurement in
 2. ~~**What is the run-to-run variance on a fixed input, per compute unit?**~~
    **Resolved 2 Aug:** zero maximum spread across 20 repeats for all four units
    on this configuration. See F-008.
-3. **Where is op localization stable under `atol`?** The issue reporter found
-   `MLModelComparator` blames ordinary `linear`/`conv` layers depending on
-   `atol`. A sweep should show a knee. *(Day 3)*
+3. ~~**Where is op localization stable under `atol`?**~~ **Resolved 4 Aug:** the
+   reporter's observation reproduces exactly — `linear` at `atol` 0.1, `conv` at
+   ≤ 0.01 — because the tolerance controls how far back `find_failing_ops`
+   walks. Stable over `atol` 1e-3–1e-2, where both the precision and
+   compute-unit arms name `conv:input_3`. See F-012. Still n = 1 input.
 4. **What ANE residency does MobileNetV3 actually achieve?** Sets the threshold
    for the compute-plan assertion. *(Day 3)*
 5. ~~**Does `measure(metrics:)` work under `swift test`, or does it require an
