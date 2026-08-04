@@ -1,0 +1,1041 @@
+{
+  "seed": 0,
+  "scales": [
+    1.0,
+    10.0,
+    100.0,
+    1000.0,
+    10000.0,
+    1000000.0,
+    1000000000000000.0,
+    1e+30,
+    1e+37
+  ],
+  "battery": [
+    "zeros",
+    "nominal",
+    "scale_10",
+    "scale_100",
+    "scale_1000",
+    "scale_10000",
+    "scale_1e+06",
+    "scale_1e+15",
+    "scale_1e+30",
+    "scale_1e+37",
+    "all_nan",
+    "all_inf",
+    "mixed_nan",
+    "mixed_inf"
+  ],
+  "runs": {
+    "fp32.cpuOnly": {
+      "zeros": {
+        "kind": "edge",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 644,
+          "abs_max": 3.6884419918060303
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "nominal": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 111,
+          "abs_max": 4.995983123779297
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_10": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 614,
+          "abs_max": 6.005527973175049
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_100": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 67.57908630371094
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1000": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 1216.608642578125
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_10000": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 12268.2373046875
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+06": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 1227718.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+15": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 1225099826954240.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+30": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 5.9895145477462336e+29
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+37": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 622,
+          "abs_max": 3.6013848781585693
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "all_nan": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 6.591705799102783
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "all_inf": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 6.591705799102783
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "mixed_nan": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 111,
+          "abs_max": 4.929704189300537
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "mixed_inf": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 4.818242073059082
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      }
+    },
+    "fp32.cpuAndNE": {
+      "zeros": {
+        "kind": "edge",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 644,
+          "abs_max": 3.6884419918060303
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "nominal": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 111,
+          "abs_max": 4.995983123779297
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_10": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 614,
+          "abs_max": 6.005527973175049
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_100": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 67.57908630371094
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1000": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 1216.608642578125
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_10000": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 12268.2373046875
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+06": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 1227718.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+15": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 1225099826954240.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+30": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 5.9895145477462336e+29
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+37": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 622,
+          "abs_max": 3.6013848781585693
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "all_nan": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 6.591705799102783
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "all_inf": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 6.591705799102783
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "mixed_nan": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 111,
+          "abs_max": 4.929704189300537
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "mixed_inf": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 4.818242073059082
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      }
+    },
+    "fp16.cpuOnly": {
+      "zeros": {
+        "kind": "edge",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 644,
+          "abs_max": 3.818359375
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "nominal": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 111,
+          "abs_max": 5.02734375
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_10": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 614,
+          "abs_max": 5.87890625
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_100": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 68.1875
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1000": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 260,
+          "abs_max": 632.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_10000": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 533,
+          "abs_max": 4.55859375
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+06": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 6.515625
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+15": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 6.515625
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+30": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 6.515625
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+37": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 6.515625
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "all_nan": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 6.515625
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "all_inf": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 904,
+          "abs_max": 6.515625
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "mixed_nan": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 111,
+          "abs_max": 4.96484375
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "mixed_inf": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 599,
+          "abs_max": 5.390625
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      }
+    },
+    "fp16.cpuAndNE": {
+      "zeros": {
+        "kind": "edge",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 644,
+          "abs_max": 3.73828125
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "nominal": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 111,
+          "abs_max": 5.1015625
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_10": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 614,
+          "abs_max": 6.01953125
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_100": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 67.6875
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1000": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 2710.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_10000": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": false,
+          "nan_count": 0,
+          "inf_count": 3,
+          "top1": 588,
+          "abs_max": 31840.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 1,
+          "nan_ops": [],
+          "inf_ops": [
+            "linear:var_930"
+          ]
+        }
+      },
+      "scale_1e+06": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": false,
+          "nan_count": 0,
+          "inf_count": 1,
+          "top1": 851,
+          "abs_max": 26352.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 1,
+          "nan_ops": [],
+          "inf_ops": [
+            "linear:var_930"
+          ]
+        }
+      },
+      "scale_1e+15": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 27968.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+30": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 27968.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "scale_1e+37": {
+        "kind": "scaled",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 27968.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "all_nan": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 20416.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "all_inf": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 29936.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "mixed_nan": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 4768.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      },
+      "mixed_inf": {
+        "kind": "control",
+        "behaviour": {
+          "all_finite": true,
+          "nan_count": 0,
+          "inf_count": 0,
+          "top1": 851,
+          "abs_max": 3504.0
+        },
+        "scan": {
+          "nan_op_count": 0,
+          "inf_op_count": 0,
+          "nan_ops": [],
+          "inf_ops": []
+        }
+      }
+    }
+  },
+  "torch_fp32_reference": {
+    "zeros": {
+      "all_finite": true,
+      "nan_count": 0,
+      "inf_count": 0,
+      "top1": 644,
+      "abs_max": 3.6884169578552246
+    },
+    "nominal": {
+      "all_finite": true,
+      "nan_count": 0,
+      "inf_count": 0,
+      "top1": 111,
+      "abs_max": 4.99599027633667
+    },
+    "scale_10": {
+      "all_finite": true,
+      "nan_count": 0,
+      "inf_count": 0,
+      "top1": 614,
+      "abs_max": 6.005526065826416
+    },
+    "scale_100": {
+      "all_finite": true,
+      "nan_count": 0,
+      "inf_count": 0,
+      "top1": 851,
+      "abs_max": 67.57917022705078
+    },
+    "scale_1000": {
+      "all_finite": true,
+      "nan_count": 0,
+      "inf_count": 0,
+      "top1": 851,
+      "abs_max": 1216.6087646484375
+    },
+    "scale_10000": {
+      "all_finite": true,
+      "nan_count": 0,
+      "inf_count": 0,
+      "top1": 851,
+      "abs_max": 12268.2470703125
+    },
+    "scale_1e+06": {
+      "all_finite": true,
+      "nan_count": 0,
+      "inf_count": 0,
+      "top1": 851,
+      "abs_max": 1227718.0
+    },
+    "scale_1e+15": {
+      "all_finite": true,
+      "nan_count": 0,
+      "inf_count": 0,
+      "top1": 851,
+      "abs_max": 1225101706002432.0
+    },
+    "scale_1e+30": {
+      "all_finite": true,
+      "nan_count": 0,
+      "inf_count": 0,
+      "top1": 851,
+      "abs_max": 5.989529659318979e+29
+    },
+    "scale_1e+37": {
+      "all_finite": false,
+      "nan_count": 1000,
+      "inf_count": 0,
+      "top1": -1,
+      "abs_max": NaN
+    },
+    "all_nan": {
+      "all_finite": false,
+      "nan_count": 1000,
+      "inf_count": 0,
+      "top1": -1,
+      "abs_max": NaN
+    },
+    "all_inf": {
+      "all_finite": false,
+      "nan_count": 1000,
+      "inf_count": 0,
+      "top1": -1,
+      "abs_max": NaN
+    },
+    "mixed_nan": {
+      "all_finite": false,
+      "nan_count": 1000,
+      "inf_count": 0,
+      "top1": -1,
+      "abs_max": NaN
+    },
+    "mixed_inf": {
+      "all_finite": false,
+      "nan_count": 1000,
+      "inf_count": 0,
+      "top1": -1,
+      "abs_max": NaN
+    }
+  },
+  "detector_ever_fired": true
+}

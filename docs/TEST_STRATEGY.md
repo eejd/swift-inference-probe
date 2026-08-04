@@ -210,7 +210,16 @@ decides whether a test blocks a merge.
 ### 5.1 Tier 1 — ships a broken feature (blocks PR)
 
 - **NaN / Inf in output.** Unconditional failure, no tolerance debate. Detected
-  by `MLModelValidator.find_failing_ops_with_nan_output()`.
+  by `MLModelValidator.find_failing_ops_with_nan_output()`. **This is a
+  sufficient condition for failure and a weak necessary one** — F-013 found the
+  NaN scan never firing across 56 configurations, and the Inf scan firing only
+  on `fp16` + `.cpuAndNE` at extreme input scale, because Core ML sanitizes
+  malformed input and saturates rather than overflowing. Pair it with the next
+  item; a green NaN/Inf scan is not evidence of a healthy model.
+- **Finite but implausible output.** The failure mode that actually occurs here:
+  a confident, finite, wrong answer. Gated on output magnitude against the fp32
+  reference and on `.cpuOnly`-vs-`.cpuAndNE` agreement, both of which flagged
+  every broken case in F-013 including the ones the validator missed.
 - **Top-1 flip on a metamorphic invariant.** The user sees a wrong answer.
 - **Compute-unit disagreement beyond tolerance.** One of the four paths is
   wrong; whichever it is, some fraction of devices gets bad output.

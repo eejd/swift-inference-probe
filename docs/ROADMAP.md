@@ -113,8 +113,11 @@ top-1 on 3/200 synthetic inputs (F-008).
 - ⏳ `MLComputePlan` → ANE residency, setting the §5.3 threshold.
 - ✅ **Run-to-run variance on a fixed input**, per compute unit: zero maximum
   spread across 20 repeats for all four units (F-008).
-- ⏳ `MLModelValidator` NaN/Inf scan, closing the last pending Day-3
-  investigation.
+- ✅ `MLModelValidator` NaN/Inf scan over a 14-input battery: the NaN scan never
+  fired, the Inf scan fired only on `fp16` + `.cpuAndNE` at extreme scale, and
+  Core ML sanitizes NaN/Inf input that PyTorch propagates. The gate is blind to
+  the failure mode that actually occurs, so TEST_STRATEGY §5.1 gained a
+  finite-but-implausible check (F-013).
 
 ### M4 — Swift test suite · next
 

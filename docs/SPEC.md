@@ -423,7 +423,7 @@ localization, because Apple's debugging utilities are Python-only.
 | `repro_2625.py` | fp16 drift across controlled synthetic input distributions | Implemented |
 | `generate_goldens.py` | PyTorch reference outputs + committed input fixtures | Planned, M4 |
 | `localize.py` | `MLModelComparator` op localization, swept across `atol` | Implemented |
-| `validate.py` | `MLModelValidator.find_failing_ops_with_nan_output()` / `_infinite_output()` | Pending, M3 |
+| `validate.py` | `MLModelValidator` NaN/Inf scan over an input battery, with a PyTorch control | Implemented |
 | `bench.py` | `MLModelBenchmarker.benchmark_load()` / `.benchmark_predict(warmup=True)` / `.benchmark_operation_execution()` | Planned |
 
 **Version pinning is mandatory.** `MLModelInspector`, `MLModelValidator`,

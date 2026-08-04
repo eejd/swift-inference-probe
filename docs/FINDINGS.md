@@ -3,11 +3,12 @@
 Every real discrepancy the harness caught, with the layer, the magnitude, the
 compute path, and a judgement on whether it is acceptable.
 
-**As of 4 Aug 2026 the repository has twelve findings.** F-001–F-004 establish
+**As of 4 Aug 2026 the repository has thirteen findings.** F-001–F-004 establish
 the toolchain and runner, F-005 isolates a coremltools native crash, F-006–F-010
 record the fp16 and compute-unit experiments, F-011 establishes that those
-experiments reproduce byte-for-byte from a fresh export, and F-012 localizes
-both the precision and compute-unit divergence to a specific op. The reusable
+experiments reproduce byte-for-byte from a fresh export, F-012 localizes both
+the precision and compute-unit divergence to a specific op, and F-013 shows the
+NaN/Inf gate is blind to the failure mode that actually occurs. The reusable
 Swift validation harness is still largely unimplemented, but the Python
 experiments run and their result JSON is committed.
 
@@ -673,6 +674,117 @@ is quoted as a general result.
 
 ---
 
+## F-013 · Core ML silently sanitizes NaN/Inf input where PyTorch propagates it
+
+**14 inputs × 2 precisions × 2 compute units, plus a PyTorch reference on the
+same inputs.** `python/validate.py`, output in
+`Fixtures/models/nan_inf_validation.json`.
+
+The task was the Tier 1 detector from TEST_STRATEGY §5.1 — "NaN / Inf in output.
+Unconditional failure, no tolerance debate." Running
+`find_failing_ops_with_nan_output()` on a nominal input reports zero failing ops
+in 0.4 s, which looks like a pass. It is not a pass until the detector is shown
+capable of firing, so the battery includes deliberately malformed inputs and a
+PyTorch arm.
+
+### The runtimes disagree about what malformed input means
+
+Same tensors, same weights:
+
+| Input | PyTorch fp32 | Core ML fp32 `.cpuOnly` |
+|---|---|---|
+| all NaN | **1000 NaN**, no top-1 | finite, **top-1 = 904**, \|max\| 6.59 |
+| all +Inf | **1000 NaN**, no top-1 | finite, **top-1 = 904**, \|max\| 6.59 |
+| 100 NaNs among 150k values | **1000 NaN**, no top-1 | finite, **top-1 = 111**, \|max\| 4.93 |
+| nominal | finite, top-1 = 111 | finite, top-1 = 111, \|max\| 5.00 |
+
+PyTorch does the IEEE-correct thing and poisons the output. Core ML returns a
+confident, plausible, finite answer. The third row is the sharpest: **injecting
+100 NaNs leaves Core ML's prediction unchanged from nominal** — same top-1, a
+2% shift in magnitude — while PyTorch declares the result undefined.
+
+Core ML also produces *identical* output for all-NaN and all-Inf input, which is
+what sanitization to a common value would look like.
+
+### The detector's coverage is real but narrow
+
+Across all 56 rows the **NaN scan never fired once**. The Inf scan fired
+**twice**, both on `fp16` + `.cpuAndNE`, at input scales 1e4 and 1e6 — the only
+two configurations in the battery where Core ML emitted a non-finite output at
+all.
+
+So the detector is not inert, but it covers a sliver of the failure space. Every
+other broken result in this battery is finite, and therefore invisible to it.
+
+### Silent saturation, at a precision-dependent threshold
+
+Scaling the nominal input and comparing top-1 against the fp32 reference:
+
+| input scale | 1e2 | 1e3 | 1e4 | 1e6 | 1e15 | 1e30 | 1e37 |
+|---|---|---|---|---|---|---|---|
+| fp32 `.cpuOnly` \|max\| | 67.6 | 1217 | 1.23e4 | 1.23e6 | 1.23e15 | 5.99e29 | **3.60** |
+| fp16 `.cpuOnly` \|max\| | 68.2 | 632 | **4.56** | 6.52 | 6.52 | 6.52 | 6.52 |
+| fp16 top-1 matches fp32 | yes | **no** | no | no | no | no | no |
+
+fp32 tracks the input linearly to about 1e30 and collapses by 1e37. fp16
+collapses three decades above nominal, at roughly 1e3, and then **freezes** —
+\|max\| pinned at 6.52 and top-1 at 904 for every larger input, the same values
+it returns for all-NaN and all-Inf. Neither collapse produces a NaN or an Inf.
+
+### Compute units diverge catastrophically on malformed input
+
+F-008 measured 1.5% top-1 flips between `.cpuOnly` and `.cpuAndNE` on
+well-formed input. On malformed input the disagreement is not a flip rate:
+
+| Input | `fp16.cpuOnly` | `fp16.cpuAndNE` |
+|---|---|---|
+| scale 1e3 | top-1 260, \|max\| 632 | top-1 851, \|max\| 2710 |
+| scale 1e4 | top-1 533, \|max\| 4.56, finite | top-1 588, \|max\| 3.18e4, **3 Infs** |
+| all +Inf | top-1 904, \|max\| 6.52 | top-1 851, \|max\| 2.99e4 |
+
+Different answers, magnitudes apart by four orders, and one path emits Inf while
+the other does not. Incidentally the `fp32` rows are **bit-identical between
+`.cpuOnly` and `.cpuAndNE` across all 14 inputs**, which is consistent with the
+Neural Engine being fp16-only and the fp32 model never reaching it.
+
+**Judgement.** Three consequences, in ascending order of cost to get wrong.
+
+**1. TEST_STRATEGY §5.1's Tier 1 rule needs qualifying.** "NaN/Inf in output" is
+a sound *sufficient* condition for failure and a nearly useless *necessary* one.
+On this configuration the dominant failure mode — saturation to a confident
+wrong answer — never trips it. The Tier 1 robustness gate needs a finite-but-
+implausible check next to it: output magnitude against the reference, or
+agreement with the fp32 path, or top-1 stability. A green NaN/Inf scan is not
+evidence of a healthy model, and the suite should not present it as one.
+
+**2. A malformed input does not announce itself in production.** A pipeline bug
+that feeds NaNs to this model gets a normal-looking class prediction back, not a
+crash and not a NaN. PyTorch would have made the same bug obvious in
+development. That gap between the training-time and deployment-time runtime is
+exactly the class of defect this project exists to find, and it is invisible to
+any test that only checks "does inference succeed."
+
+**3. Robustness tests must be differential too.** The single most reliable
+signal in this battery was not the validator; it was fp32-vs-fp16 and
+CPU-vs-ANE disagreement, which flagged every broken row including the finite
+ones. That is the same conclusion F-007 reached from the opposite direction.
+
+**Caveats.** Two, and the first is a genuine open question.
+
+**Where the sanitization happens is not determined by these measurements.** It
+could be the coremltools Python wrapper conditioning the array before dispatch,
+the Core ML framework, or a per-backend compiler. The compute-unit differences
+argue against a single pre-dispatch scrub, and `.cpuAndNE` emitting Inf shows
+the stack *can* return non-finite values — but neither is conclusive. Driving
+the same inputs through the Swift `ModelRunner` in M4 would separate the Python
+wrapper from the framework, and that is the experiment to run next.
+
+**n = 1 base input.** The magnitude sweep scales one seeded tensor. Thresholds
+like "fp16 collapses near 1e3" are properties of this input's activation
+statistics and should not be quoted as general figures.
+
+---
+
 ## Investigation status
 
 Each investigation resolves to a finding entry, including negative results.
@@ -686,4 +798,4 @@ finding, especially when the upstream report claims hardware dependence.
 | 3 | Where does `MLModelComparator` op localization stabilize under an `atol` sweep? | **Complete** — two plateaus per arm; both arms agree on `conv:input_3` over `atol` 1e-3–1e-2, and the tolerance is shown to control search depth (F-012) |
 | 4 | Run-to-run variance on a fixed input, per compute unit | **Complete** — zero maximum spread across 20 repeats/unit (F-008) |
 | 5 | What ANE residency does MobileNetV3-Large actually achieve? | **Pending** |
-| 6 | Any NaN/Inf-producing ops via `MLModelValidator`? | **Pending** |
+| 6 | Any NaN/Inf-producing ops via `MLModelValidator`? | **Complete** — one Inf-producing op, only on `fp16` + `.cpuAndNE` at extreme input scale; the NaN scan never fired, and Core ML sanitizes NaN/Inf input that PyTorch propagates (F-013) |
