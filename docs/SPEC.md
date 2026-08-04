@@ -424,6 +424,7 @@ localization, because Apple's debugging utilities are Python-only.
 | `generate_goldens.py` | PyTorch reference outputs + committed input fixtures | Planned, M4 |
 | `localize.py` | `MLModelComparator` op localization, swept across `atol` | Implemented |
 | `validate.py` | `MLModelValidator` NaN/Inf scan over an input battery, with a PyTorch control | Implemented |
+| `compute_plan.py` | `MLComputePlan` per-op device assignment and ANE residency, by op count and cost | Implemented |
 | `bench.py` | `MLModelBenchmarker.benchmark_load()` / `.benchmark_predict(warmup=True)` / `.benchmark_operation_execution()` | Planned |
 
 **Version pinning is mandatory.** `MLModelInspector`, `MLModelValidator`,
@@ -455,8 +456,10 @@ Tracked here rather than guessed at; each is resolved by a measurement in
    ≤ 0.01 — because the tolerance controls how far back `find_failing_ops`
    walks. Stable over `atol` 1e-3–1e-2, where both the precision and
    compute-unit arms name `conv:input_3`. See F-012. Still n = 1 input.
-4. **What ANE residency does MobileNetV3 actually achieve?** Sets the threshold
-   for the compute-plan assertion. *(Day 3)*
+4. ~~**What ANE residency does MobileNetV3 actually achieve?**~~ **Resolved
+   4 Aug:** 100% at fp16 — all 182 scheduled ops and 100% of estimated cost — so
+   the compute-plan assertion is an equality rather than a threshold. At fp32 no
+   op can reach the ANE and `.cpuAndNE` compiles to a pure-CPU plan. See F-014.
 5. ~~**Does `measure(metrics:)` work under `swift test`, or does it require an
    Xcode scheme?**~~ **Resolved 1 Aug — yes, it works.** But baselines do not,
    so the regression gate needs our own baseline file. See §4.8 and FINDINGS

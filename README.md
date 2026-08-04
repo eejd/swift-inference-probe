@@ -53,6 +53,7 @@ python compute_unit_differential.py  # noise floor + 4 compute units, n=200   (F
 python repro_2625.py                 # fp16 drift across input distributions  (F-009, F-010)
 python localize.py                   # which op diverges, swept across atol   (F-012)
 python validate.py                   # NaN/Inf scan + malformed-input battery (F-013)
+python compute_plan.py               # per-op device assignment, ANE residency (F-014)
 ```
 
 Each writes its result JSON into `Fixtures/models/`, and those files are

@@ -165,7 +165,8 @@ need either representative real inputs or the unfinished compute-plan study.
 | ANE-vs-CPU `l1Mean` max | **0.030** | F-008 p95 0.0218, max 0.0242 → ~25% headroom |
 | GPU-vs-CPU `l1Mean` max | **0.020** | F-008 p95 0.0124, max 0.0149 → ~35% headroom |
 | ANE-vs-CPU `cosineSimilarity` min | **0.9990** | F-008 min observed 0.999574 |
-| ANE residency floor | ⟨measure⟩ | measured plan on a known-good build — M3 |
+| ANE residency floor, **fp16** | **100%** — assert equality, not a floor | F-014, all 182 scheduled ops and 100% of cost |
+| ANE residency floor, **fp32** | **n/a** — 0 ops can reach the ANE | F-014; `.cpuAndNE` compiles to a pure-CPU plan |
 | Perf regression trigger | 10% over baseline | default; revisit against measured p95 jitter |
 
 **The noise floor being exactly zero is what licenses tight thresholds here.**
@@ -243,8 +244,24 @@ for most matmuls, convs, and attention; GPU for what ANE cannot do; CPU for the
 rest. `MLComputePlan` exposes the anticipated assignment per op *before you run
 anything*.
 
-So: **assert that ≥⟨measure⟩% of ops are Neural-Engine resident, and fail if a
-change pushes ops back to CPU.**
+So: **assert that ≥100% of ops are Neural-Engine resident, and fail if a change
+pushes ops back to CPU.**
+
+F-014 measured that figure and it came back at the ceiling: **all 182 scheduled
+ops, 100% of estimated cost, on the ANE** — but only at fp16. At fp32 *no* op
+can reach the ANE, `.cpuAndNE` compiles to a pure-CPU plan, and `.all` picks the
+GPU. Two consequences for how this assertion is written:
+
+- Because residency is 100% rather than some partial figure, the assertion is an
+  **equality, not a threshold**. Any op moving off the ANE is a regression, and
+  there is no headroom to argue about.
+- **`.cpuAndNE` is not an ANE test unless the model is fp16.** A parity suite
+  that runs an fp32 model under `.cpuAndNE` is silently testing the CPU path
+  twice.
+- **Assert on device assignment, never on the cost estimate.** F-014 found the
+  assignment bit-stable across plan loads while the per-op cost weights wobble
+  in their last ulp. A golden keyed on the raw plan would flake with nothing
+  changed.
 
 This is a performance regression test **on the compilation result rather than the
 wall clock**. Two consequences:

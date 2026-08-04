@@ -105,12 +105,15 @@ machine (F-006, F-009, F-010). The compute-unit differential ran over 200
 inputs: every path had a zero repeat-run noise floor, while CPU-vs-ANE changed
 top-1 on 3/200 synthetic inputs (F-008).
 
-### M3 — Localization and variance · ⏳ partial
+### M3 — Localization and variance · ✅ done
 
 - ✅ `MLModelComparator` op localization **swept across `atol`**: two plateaus
   per arm, both agreeing on `conv:input_3` over `atol` 1e-3–1e-2, with the
   tolerance shown to control the search depth that produces the answer (F-012).
-- ⏳ `MLComputePlan` → ANE residency, setting the §5.3 threshold.
+- ✅ `MLComputePlan` → ANE residency: **100% at fp16** by op count and by cost,
+  so §5.3 becomes an equality rather than a threshold. At fp32 no op reaches the
+  ANE and `.cpuAndNE` compiles to a pure-CPU plan, which also confirms the
+  dispatch inference F-007 left open (F-014).
 - ✅ **Run-to-run variance on a fixed input**, per compute unit: zero maximum
   spread across 20 repeats for all four units (F-008).
 - ✅ `MLModelValidator` NaN/Inf scan over a 14-input battery: the NaN scan never

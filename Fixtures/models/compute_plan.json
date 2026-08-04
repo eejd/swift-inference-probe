@@ -1,0 +1,246 @@
+{
+  "runs": {
+    "fp16.cpuOnly": {
+      "planned_ops": 182,
+      "unplanned_ops": 536,
+      "total_estimated_cost": 1.0,
+      "by_device": {
+        "cpu": {
+          "op_count": 182,
+          "cost": 1.0,
+          "op_types": {
+            "ios18.conv": 62,
+            "ios18.sigmoid_hard": 29,
+            "ios18.mul": 29,
+            "ios18.thresholded_relu": 21,
+            "ios18.relu": 19,
+            "ios18.add": 10,
+            "ios16.reduce_mean": 9,
+            "ios18.linear": 2,
+            "ios18.reshape": 1
+          },
+          "op_share": 1.0,
+          "cost_share": 1.0
+        }
+      },
+      "ane_residency_by_op_count": 0.0,
+      "ane_residency_by_cost": 0.0,
+      "ane_capability": "not measurable \u2014 this compute unit excludes the ANE, so no op reports it as supported regardless of the op"
+    },
+    "fp16.cpuAndGPU": {
+      "planned_ops": 182,
+      "unplanned_ops": 536,
+      "total_estimated_cost": 1.0,
+      "by_device": {
+        "gpu": {
+          "op_count": 182,
+          "cost": 1.0,
+          "op_types": {
+            "ios18.conv": 62,
+            "ios18.sigmoid_hard": 29,
+            "ios18.mul": 29,
+            "ios18.thresholded_relu": 21,
+            "ios18.relu": 19,
+            "ios18.add": 10,
+            "ios16.reduce_mean": 9,
+            "ios18.linear": 2,
+            "ios18.reshape": 1
+          },
+          "op_share": 1.0,
+          "cost_share": 1.0
+        }
+      },
+      "ane_residency_by_op_count": 0.0,
+      "ane_residency_by_cost": 0.0,
+      "ane_capability": "not measurable \u2014 this compute unit excludes the ANE, so no op reports it as supported regardless of the op"
+    },
+    "fp16.cpuAndNE": {
+      "planned_ops": 182,
+      "unplanned_ops": 536,
+      "total_estimated_cost": 1.0,
+      "by_device": {
+        "ane": {
+          "op_count": 182,
+          "cost": 1.0,
+          "op_types": {
+            "ios18.conv": 62,
+            "ios18.sigmoid_hard": 29,
+            "ios18.mul": 29,
+            "ios18.thresholded_relu": 21,
+            "ios18.relu": 19,
+            "ios18.add": 10,
+            "ios16.reduce_mean": 9,
+            "ios18.linear": 2,
+            "ios18.reshape": 1
+          },
+          "op_share": 1.0,
+          "cost_share": 1.0
+        }
+      },
+      "ane_residency_by_op_count": 1.0,
+      "ane_residency_by_cost": 1.0,
+      "ops_ane_capable": 182,
+      "ops_not_ane_capable": []
+    },
+    "fp16.all": {
+      "planned_ops": 182,
+      "unplanned_ops": 536,
+      "total_estimated_cost": 1.0,
+      "by_device": {
+        "ane": {
+          "op_count": 182,
+          "cost": 1.0,
+          "op_types": {
+            "ios18.conv": 62,
+            "ios18.sigmoid_hard": 29,
+            "ios18.mul": 29,
+            "ios18.thresholded_relu": 21,
+            "ios18.relu": 19,
+            "ios18.add": 10,
+            "ios16.reduce_mean": 9,
+            "ios18.linear": 2,
+            "ios18.reshape": 1
+          },
+          "op_share": 1.0,
+          "cost_share": 1.0
+        }
+      },
+      "ane_residency_by_op_count": 1.0,
+      "ane_residency_by_cost": 1.0,
+      "ops_ane_capable": 182,
+      "ops_not_ane_capable": []
+    },
+    "fp32.cpuOnly": {
+      "planned_ops": 182,
+      "unplanned_ops": 536,
+      "total_estimated_cost": 1.0,
+      "by_device": {
+        "cpu": {
+          "op_count": 182,
+          "cost": 1.0,
+          "op_types": {
+            "ios18.conv": 62,
+            "ios18.sigmoid_hard": 29,
+            "ios18.mul": 29,
+            "ios18.thresholded_relu": 21,
+            "ios18.relu": 19,
+            "ios18.add": 10,
+            "ios16.reduce_mean": 9,
+            "ios18.linear": 2,
+            "ios18.reshape": 1
+          },
+          "op_share": 1.0,
+          "cost_share": 1.0
+        }
+      },
+      "ane_residency_by_op_count": 0.0,
+      "ane_residency_by_cost": 0.0,
+      "ane_capability": "not measurable \u2014 this compute unit excludes the ANE, so no op reports it as supported regardless of the op"
+    },
+    "fp32.cpuAndGPU": {
+      "planned_ops": 182,
+      "unplanned_ops": 536,
+      "total_estimated_cost": 1.0,
+      "by_device": {
+        "gpu": {
+          "op_count": 182,
+          "cost": 1.0,
+          "op_types": {
+            "ios18.conv": 62,
+            "ios18.sigmoid_hard": 29,
+            "ios18.mul": 29,
+            "ios18.thresholded_relu": 21,
+            "ios18.relu": 19,
+            "ios18.add": 10,
+            "ios16.reduce_mean": 9,
+            "ios18.linear": 2,
+            "ios18.reshape": 1
+          },
+          "op_share": 1.0,
+          "cost_share": 1.0
+        }
+      },
+      "ane_residency_by_op_count": 0.0,
+      "ane_residency_by_cost": 0.0,
+      "ane_capability": "not measurable \u2014 this compute unit excludes the ANE, so no op reports it as supported regardless of the op"
+    },
+    "fp32.cpuAndNE": {
+      "planned_ops": 182,
+      "unplanned_ops": 536,
+      "total_estimated_cost": 1.0,
+      "by_device": {
+        "cpu": {
+          "op_count": 182,
+          "cost": 1.0,
+          "op_types": {
+            "ios18.conv": 62,
+            "ios18.sigmoid_hard": 29,
+            "ios18.mul": 29,
+            "ios18.thresholded_relu": 21,
+            "ios18.relu": 19,
+            "ios18.add": 10,
+            "ios16.reduce_mean": 9,
+            "ios18.linear": 2,
+            "ios18.reshape": 1
+          },
+          "op_share": 1.0,
+          "cost_share": 1.0
+        }
+      },
+      "ane_residency_by_op_count": 0.0,
+      "ane_residency_by_cost": 0.0,
+      "ops_ane_capable": 0,
+      "ops_not_ane_capable": [
+        "ios16.reduce_mean",
+        "ios18.add",
+        "ios18.conv",
+        "ios18.linear",
+        "ios18.mul",
+        "ios18.relu",
+        "ios18.reshape",
+        "ios18.sigmoid_hard",
+        "ios18.thresholded_relu"
+      ]
+    },
+    "fp32.all": {
+      "planned_ops": 182,
+      "unplanned_ops": 536,
+      "total_estimated_cost": 1.0,
+      "by_device": {
+        "gpu": {
+          "op_count": 182,
+          "cost": 1.0,
+          "op_types": {
+            "ios18.conv": 62,
+            "ios18.sigmoid_hard": 29,
+            "ios18.mul": 29,
+            "ios18.thresholded_relu": 21,
+            "ios18.relu": 19,
+            "ios18.add": 10,
+            "ios16.reduce_mean": 9,
+            "ios18.linear": 2,
+            "ios18.reshape": 1
+          },
+          "op_share": 1.0,
+          "cost_share": 1.0
+        }
+      },
+      "ane_residency_by_op_count": 0.0,
+      "ane_residency_by_cost": 0.0,
+      "ops_ane_capable": 0,
+      "ops_not_ane_capable": [
+        "ios16.reduce_mean",
+        "ios18.add",
+        "ios18.conv",
+        "ios18.linear",
+        "ios18.mul",
+        "ios18.relu",
+        "ios18.reshape",
+        "ios18.sigmoid_hard",
+        "ios18.thresholded_relu"
+      ]
+    }
+  },
+  "fp16_all_matches_cpuAndNE": true,
+  "fp32_all_matches_cpuAndNE": false
+}

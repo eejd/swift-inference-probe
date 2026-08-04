@@ -3,13 +3,14 @@
 Every real discrepancy the harness caught, with the layer, the magnitude, the
 compute path, and a judgement on whether it is acceptable.
 
-**As of 4 Aug 2026 the repository has thirteen findings.** F-001–F-004 establish
+**As of 4 Aug 2026 the repository has fourteen findings.** F-001–F-004 establish
 the toolchain and runner, F-005 isolates a coremltools native crash, F-006–F-010
 record the fp16 and compute-unit experiments, F-011 establishes that those
 experiments reproduce byte-for-byte from a fresh export, F-012 localizes both
-the precision and compute-unit divergence to a specific op, and F-013 shows the
-NaN/Inf gate is blind to the failure mode that actually occurs. The reusable
-Swift validation harness is still largely unimplemented, but the Python
+the precision and compute-unit divergence to a specific op, F-013 shows the
+NaN/Inf gate is blind to the failure mode that actually occurs, and F-014 reads
+dispatch off the compute plan and confirms the inference F-007 left open. The
+reusable Swift validation harness is still largely unimplemented, but the Python
 experiments run and their result JSON is committed.
 
 Entry format: what was observed · how it was measured · **judgement**. A finding
@@ -785,6 +786,90 @@ statistics and should not be quoted as general figures.
 
 ---
 
+## F-014 · ANE residency is 100% at fp16 and 0% at fp32; dispatch is all-or-nothing
+
+**2 precisions × 4 compute units, read from the compute plan rather than
+inferred from behaviour.** `python/compute_plan.py`, output in
+`Fixtures/models/compute_plan.json`.
+
+Every earlier compute-unit finding inferred dispatch from output. F-007 saw
+`.all` and `.cpuAndNE` produce bit-identical results and concluded Core ML must
+be routing to the Neural Engine, then named confirming it against `MLComputePlan`
+as the M3 task. This reads the assignment directly.
+
+**Measured.** 718 ops, of which **182 are scheduled work** and 536 are `const`
+and other unscheduled nodes. Preferred device per op, with Core ML's own
+estimated cost weights:
+
+| Model | `.cpuOnly` | `.cpuAndGPU` | `.cpuAndNE` | `.all` |
+|---|---|---|---|---|
+| **fp16** | 100% CPU | 100% GPU | **100% ANE** | **100% ANE** |
+| **fp32** | 100% CPU | 100% GPU | **100% CPU** | **100% GPU** |
+
+Identical by op count and by cost weight — every configuration puts **all 182
+ops and 100% of estimated cost on a single device**. There is no partitioning
+anywhere in this matrix.
+
+**Judgement.** Four results.
+
+**1. ANE residency for MobileNetV3-Large fp16 is 100%**, by op count and by
+cost. That is the figure TEST_STRATEGY §5.3 needed, and it makes the threshold
+easy: anything below 100% on this model is a dispatch regression.
+
+**2. F-007's inference is confirmed, directly.** The fp16 `.all` and `.cpuAndNE`
+plans are identical — same device, same 182 ops. That is *why* they were
+bit-identical in F-007 and across all 200 inputs in F-008: they are not two
+paths that happen to agree, they are the same plan. The differential test
+between them therefore asserts that dispatch has not changed, exactly as F-007
+argued it should.
+
+**3. The fp32 model cannot reach the Neural Engine at all.** Under `.cpuAndNE`,
+where the ANE is permitted, **0 of 182 ops report it as a supported device** and
+the whole model falls back to CPU. This explains an observation left dangling in
+F-013: the fp32 rows there were bit-identical between `.cpuOnly` and `.cpuAndNE`
+across all 14 inputs. They were not merely similar — Core ML compiled the same
+CPU plan for both. The ANE is fp16-only for this model, which is consistent with
+it being fp16 hardware, and it means **`.cpuAndNE` is not an ANE test unless the
+model is fp16**.
+
+**4. `.all` is not a synonym for `.cpuAndNE`.** At fp32, `.all` chooses the
+**GPU** while `.cpuAndNE` falls back to CPU. So the F-007 equivalence is a
+property of the fp16 model, not of the two compute units, and a suite that
+treats `.all` as "probably the ANE" would be wrong on half this matrix. It also
+predicts something not yet measured: fp32 `.all` should *differ* from fp32
+`.cpuOnly`, since one runs on GPU and the other on CPU.
+
+**5. The device assignment is deterministic; the cost estimate is not.** Two
+consecutive runs produce identical device assignments for all 182 ops and
+totals that differ in the last ulp — 0.9999999999999986 against
+0.9999999999999981. The per-op weights wobble across plan loads. This is the
+same shape as F-011: **the load-bearing part is reproducible, an incidental
+float is not**, and a golden test that hashes the raw plan would flake without
+anything having changed. The compute-plan assertion in §5.3 must therefore be
+written against *device assignment*, not against cost floats. The script rounds
+cost to 6 decimals, which also stops it reporting sixteen significant digits of
+a number Core ML calls an estimate.
+
+**A measurement artifact worth recording**, because it nearly became a false
+finding. `MLComputePlanDeviceUsage.supported_compute_devices` reports what is
+available *under the requested configuration*, not a static property of the op.
+Under `.cpuOnly` no op lists the ANE — trivially true, and meaningless as
+evidence about the op. The first version of this script reported "9 op types not
+ANE-capable" for every CPU and GPU configuration, which reads like a finding and
+is an artifact of the question being unanswerable in that configuration. The
+metric is now computed only where the ANE is actually permitted, which is what
+makes the fp32 0-of-182 result meaningful.
+
+**Caveat.** One model. All-or-nothing dispatch is likely a property of
+MobileNetV3-Large being uniformly ANE-friendly at fp16; a model with an
+unsupported op would partition, and that is the case where a residency
+*threshold* rather than a residency *assertion* starts to matter. Also note
+`MLComputePlan.load_from_path` requires a compiled `.mlmodelc` — handing it an
+`.mlpackage` aborts the process with an uncaught C++ exception rather than a
+Python error.
+
+---
+
 ## Investigation status
 
 Each investigation resolves to a finding entry, including negative results.
@@ -797,5 +882,5 @@ finding, especially when the upstream report claims hardware dependence.
 | 2 | What fraction of inputs disagree between `.cpuOnly` and `.cpuAndNeuralEngine`, and by how much? | **Complete** — 3/200 top-1 flips on synthetic inputs, with the full distribution in F-008 |
 | 3 | Where does `MLModelComparator` op localization stabilize under an `atol` sweep? | **Complete** — two plateaus per arm; both arms agree on `conv:input_3` over `atol` 1e-3–1e-2, and the tolerance is shown to control search depth (F-012) |
 | 4 | Run-to-run variance on a fixed input, per compute unit | **Complete** — zero maximum spread across 20 repeats/unit (F-008) |
-| 5 | What ANE residency does MobileNetV3-Large actually achieve? | **Pending** |
+| 5 | What ANE residency does MobileNetV3-Large actually achieve? | **Complete** — 100% at fp16 by op count and cost; 0% at fp32, where no op can reach the ANE at all (F-014) |
 | 6 | Any NaN/Inf-producing ops via `MLModelValidator`? | **Complete** — one Inf-producing op, only on `fp16` + `.cpuAndNE` at extreme input scale; the NaN scan never fired, and Core ML sanitizes NaN/Inf input that PyTorch propagates (F-013) |
