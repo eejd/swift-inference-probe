@@ -132,7 +132,12 @@ python repro_2625.py                 # fp16 drift across input distributions  (F
 python localize.py                   # op localization swept across atol      (F-012)
 python validate.py                   # NaN/Inf scan + malformed-input battery (F-013)
 python compute_plan.py               # per-op device assignment, ANE residency (F-014)
+python generate_goldens.py           # commit input tensors + PyTorch references
 ```
+
+`generate_goldens.py` output under `Fixtures/inputs` and `Fixtures/goldens` **is
+tracked**, unlike the models: it cannot be regenerated identically in Swift
+(F-015), so those bytes are the cross-language contract `ParityTests` reads.
 
 `localize.py` takes ~15 min because a strict `atol` traverses the whole op
 graph; `--arm compute --atols 1e-2` is the smoke-test form. All of them accept

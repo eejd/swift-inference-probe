@@ -446,7 +446,7 @@ localization, because Apple's debugging utilities are Python-only.
 | `export_model.py` | torchvision → Core ML at fp32 and fp16; emits a version manifest | Implemented |
 | `compute_unit_differential.py` | Repeat-run noise floor and all compute units against `.cpuOnly` | Implemented |
 | `repro_2625.py` | fp16 drift across controlled synthetic input distributions | Implemented |
-| `generate_goldens.py` | PyTorch reference outputs + committed input fixtures | Planned, M4 |
+| `generate_goldens.py` | PyTorch reference outputs + committed input fixtures, raw f32 + manifest | Implemented |
 | `localize.py` | `MLModelComparator` op localization, swept across `atol` | Implemented |
 | `validate.py` | `MLModelValidator` NaN/Inf scan over an input battery, with a PyTorch control | Implemented |
 | `compute_plan.py` | `MLComputePlan` per-op device assignment and ANE residency, by op count and cost | Implemented |

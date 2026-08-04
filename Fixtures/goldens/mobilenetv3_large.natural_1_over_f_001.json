@@ -1,0 +1,41 @@
+{
+  "id": "mobilenetv3_large.natural_1_over_f_001",
+  "distribution": "natural_1_over_f",
+  "producedBy": {
+    "chip": "Apple M4 Pro",
+    "macos": "26.5.2",
+    "python": "3.12.13",
+    "torch": "2.13.0",
+    "torchvision": "0.28.0",
+    "coremltools": "9.0",
+    "numpy": "2.5.1"
+  },
+  "blessedAt": "2026-08-04T09:20:19+00:00",
+  "reason": "initial baseline",
+  "input": {
+    "file": "mobilenetv3_large.natural_1_over_f_001.input.f32.bin",
+    "shape": [
+      1,
+      3,
+      224,
+      224
+    ],
+    "dtype": "float32",
+    "sha256": "c8741034130674c5ca468e6b55ab67d768c3ae19b342da8d0b00f67f5f9a1787"
+  },
+  "reference": {
+    "file": "mobilenetv3_large.natural_1_over_f_001.pytorch_fp32.f32.bin",
+    "shape": [
+      1,
+      1000
+    ],
+    "dtype": "float32",
+    "sha256": "30f73f5e0f790f0c985b173f71b1f93002597cf2cb4845f488e7327213d24fc4",
+    "source": "pytorch fp32 (torchvision pretrained)"
+  },
+  "modelWeightSha256": {
+    "fp32": "fabc1f4d131b62447a385b42b0ca88f973c98e3ea00a3c7b91aa0d7ca067cd7b",
+    "fp16": "1a411b060824f71b2b78ef776e5d18710eeebece431a3f4e3e526941628a033f"
+  },
+  "top1": 885
+}

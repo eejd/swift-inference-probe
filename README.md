@@ -54,7 +54,13 @@ python repro_2625.py                 # fp16 drift across input distributions  (F
 python localize.py                   # which op diverges, swept across atol   (F-012)
 python validate.py                   # NaN/Inf scan + malformed-input battery (F-013)
 python compute_plan.py               # per-op device assignment, ANE residency (F-014)
+python generate_goldens.py           # commit input tensors + PyTorch references
 ```
+
+`generate_goldens.py` writes to `Fixtures/inputs/` and `Fixtures/goldens/`,
+which **are** tracked — unlike the models, they cannot be regenerated
+identically in another language (F-015), so the bytes are the contract the
+Swift `ParityTests` read. Re-running it re-blesses; pass `--reason` to say why.
 
 Each writes its result JSON into `Fixtures/models/`, and those files are
 committed — so the useful check is not just that a script runs but that it

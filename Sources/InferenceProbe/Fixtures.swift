@@ -29,6 +29,21 @@ public enum Fixtures {
         packageRoot.appendingPathComponent("Fixtures/models")
     }
 
+    /// Committed input tensors and their PyTorch references. Unlike the models
+    /// these *are* tracked: they cannot be regenerated identically in Swift
+    /// (F-015), so the bytes are the cross-language contract.
+    public static var inputsDirectory: URL {
+        packageRoot.appendingPathComponent("Fixtures/inputs")
+    }
+
+    public static var goldensDirectory: URL {
+        packageRoot.appendingPathComponent("Fixtures/goldens")
+    }
+
+    public static var goldensAvailable: Bool {
+        FileManager.default.fileExists(atPath: goldensDirectory.path)
+    }
+
     public static func modelURL(_ precision: ModelRunner.Precision) -> URL {
         modelsDirectory.appendingPathComponent(
             "mobilenet_v3_large.\(precision.rawValue).mlpackage")

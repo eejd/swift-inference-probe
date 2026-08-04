@@ -135,11 +135,17 @@ top-1 on 3/200 synthetic inputs (F-008).
   dispatch assertion F-014 justified and a zero-noise-floor check.
 - ✅ `RobustnessTests` — the malformed-input battery, which answered F-013's
   open question and produced F-015.
-- ⏳ `GoldenStore` with `bless(_:as:reason:)`, and the committed input tensors
-  it needs. F-011 constrains the design: golden identity must not be a digest
-  of the `.mlpackage`.
-- ⏳ `ParityTests` against the PyTorch reference, `MetamorphicTests`,
-  `MetamorphicRelation`, `Metrics`, and `PerformanceTests` (XCTest).
+- ✅ `GoldenStore` with an audited `bless(_:as:reason:)` that carries forward
+  the previous reason, plus `python/generate_goldens.py` and the committed
+  tensors under `Fixtures/inputs` and `Fixtures/goldens`. Per F-011 the golden
+  records a digest of `weight.bin`, never of the `.mlpackage`; loading verifies
+  the tensor digest so a truncated fixture fails as corruption rather than as a
+  numerical error.
+- ✅ `ParityTests` against the committed PyTorch reference, at both precisions,
+  with the fp32 path asserted as the control that makes the fp16 number
+  attributable.
+- ⏳ `MetamorphicTests` and `MetamorphicRelation`, `Metrics` (p50/p95), and
+  `PerformanceTests` (XCTest).
 
 Failure messages must name the offending layer, not report that outputs differ.
 

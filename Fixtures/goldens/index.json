@@ -1,0 +1,11 @@
+{
+  "count": 4,
+  "ids": [
+    "mobilenetv3_large.white_noise_000",
+    "mobilenetv3_large.white_noise_001",
+    "mobilenetv3_large.natural_1_over_f_000",
+    "mobilenetv3_large.natural_1_over_f_001"
+  ],
+  "format": "raw little-endian float32; shape and sha256 in each manifest",
+  "note": "Regenerating inputs from a seed is not reproducible across languages (F-015). These bytes are the contract."
+}

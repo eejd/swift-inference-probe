@@ -18,5 +18,6 @@ let package = Package(
         // remaining M4 targets.
         .testTarget(name: "ComputeUnitTests", dependencies: ["InferenceProbe"]),
         .testTarget(name: "RobustnessTests", dependencies: ["InferenceProbe"]),
+        .testTarget(name: "ParityTests", dependencies: ["InferenceProbe"]),
     ]
 )
