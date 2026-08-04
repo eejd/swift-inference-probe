@@ -1,6 +1,7 @@
 # InferenceProbe — Specification
 
-**Status:** draft, 1 Aug 2026. Written before implementation; expect revision as measurements land.
+**Status:** living draft, updated 3 Aug 2026. M0–M2 are complete, M3 is
+partial, and the component contracts below remain the target for M4.
 
 A test harness that validates Core ML inference on Apple silicon for numerical
 correctness across compute units, robustness, and performance regression, with a
@@ -22,8 +23,8 @@ input perturbations, and that it does so within a performance envelope.
 
 1. **Numerical parity** — Core ML output vs. the PyTorch reference, under an
    explicit tolerance policy.
-2. **Compute-unit differential** — `.cpuOnly` / `.cpuAndGPU` /
-   `.cpuAndNeuralEngine` / `.all` pairwise agreement.
+2. **Compute-unit differential** — `.cpuAndGPU` / `.cpuAndNeuralEngine` /
+   `.all` agreement against the `.cpuOnly` anchor.
 3. **Compute-plan assertions** — op-to-device assignment as a first-class
    testable property, not just a performance side effect.
 4. **Metamorphic relations** — properties that must hold between related inputs,
@@ -154,7 +155,14 @@ and the harness records the host chip in every result.
 
 ---
 
-## 3. Repo layout
+## 3. Target repo layout
+
+This is the intended M4/M5 layout, not a claim that every file exists today.
+As of 3 Aug, the Swift side contains `HostEnvironment.swift` and
+`HarnessTests`; the Python side contains `export_model.py`,
+`compute_unit_differential.py`, and `repro_2625.py`. Generated model packages
+are local and ignored, while their manifests and measurement JSON are tracked
+under `Fixtures/models*`.
 
 ```
 InferenceProbe/
@@ -408,13 +416,15 @@ public struct LatencyStats: Sendable, Codable {
 The Swift harness asserts; Python produces references and does op-level
 localization, because Apple's debugging utilities are Python-only.
 
-| Script | Responsibility |
-|---|---|
-| `export_model.py` | torchvision → Core ML at fp32 and fp16; emits a version manifest |
-| `generate_goldens.py` | PyTorch reference outputs + committed input fixtures |
-| `localize.py` | `MLModelComparator` op localization, swept across `atol` |
-| `validate.py` | `MLModelValidator.find_failing_ops_with_nan_output()` / `_infinite_output()` |
-| `bench.py` | `MLModelBenchmarker.benchmark_load()` / `.benchmark_predict(warmup=True)` / `.benchmark_operation_execution()` |
+| Script | Responsibility | Status |
+|---|---|---|
+| `export_model.py` | torchvision → Core ML at fp32 and fp16; emits a version manifest | Implemented |
+| `compute_unit_differential.py` | Repeat-run noise floor and all compute units against `.cpuOnly` | Implemented |
+| `repro_2625.py` | fp16 drift across controlled synthetic input distributions | Implemented |
+| `generate_goldens.py` | PyTorch reference outputs + committed input fixtures | Planned, M4 |
+| `localize.py` | `MLModelComparator` op localization, swept across `atol` | Pending, M3 |
+| `validate.py` | `MLModelValidator.find_failing_ops_with_nan_output()` / `_infinite_output()` | Pending, M3 |
+| `bench.py` | `MLModelBenchmarker.benchmark_load()` / `.benchmark_predict(warmup=True)` / `.benchmark_operation_execution()` | Planned |
 
 **Version pinning is mandatory.** `MLModelInspector`, `MLModelValidator`,
 `MLModelComparator`, and `MLModelBenchmarker` live under
@@ -433,11 +443,13 @@ Python **3.12**. See [`ROADMAP.md`](ROADMAP.md) §Environment.
 Tracked here rather than guessed at; each is resolved by a measurement in
 [`ROADMAP.md`](ROADMAP.md).
 
-1. **Does coremltools #2625 reproduce on M4 Pro / macOS 26.5.2?** The issue was
-   filed on M1 Air + M1 Max / macOS 26.1. A non-repro is evidence for the
-   hardware-dependence claim, not a failed experiment. *(Day 2)*
-2. **What is the run-to-run variance on a fixed input, per compute unit?** Every
-   tolerance threshold should be derived from this, not chosen. *(Day 3)*
+1. ~~**Does coremltools #2625 reproduce on M4 Pro / macOS 26.5.2?**~~
+   **Characterized 3 Aug:** the direction reproduces but the reported magnitude
+   does not. Input distribution and torch version are eliminated; hardware/OS
+   remains the leading explanation but is not proven. See F-006, F-009, F-010.
+2. ~~**What is the run-to-run variance on a fixed input, per compute unit?**~~
+   **Resolved 2 Aug:** zero maximum spread across 20 repeats for all four units
+   on this configuration. See F-008.
 3. **Where is op localization stable under `atol`?** The issue reporter found
    `MLModelComparator` blames ordinary `linear`/`conv` layers depending on
    `atol`. A sweep should show a knee. *(Day 3)*

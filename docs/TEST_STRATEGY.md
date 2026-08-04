@@ -1,7 +1,8 @@
 # Test Strategy — InferenceProbe
 
-**Status:** draft, 1 Aug 2026. Thresholds marked ⟨measure⟩ are deliberately
-unset; they are derived from measured variance, not chosen. See §4.3.
+**Status:** living draft, updated 3 Aug 2026. Thresholds marked ⟨measure⟩ are
+deliberately unset; they require additional measurements rather than a chosen
+round number. See §4.3.
 
 ---
 
@@ -27,8 +28,10 @@ green run means the runtime behaved; it does not mean the model is good.
 Conventional software testing assumes an oracle: a known-correct expected value
 you assert against. ML inference frequently has none.
 
-- Floating-point execution is **not bit-reproducible** across GPU and Neural
-  Engine. Reduction order varies; results vary in the last bits.
+- Different compute units are **not bit-identical to one another**. On this M4
+  Pro each unit was bit-deterministic across repeated runs (F-008), but CPU,
+  GPU, and Neural Engine outputs differ systematically because their numerical
+  execution paths differ.
 - coremltools converts to **fp16 by default**. Divergence from the fp32 PyTorch
   reference is *expected behaviour*, not a bug, so `assertEqual` is not merely
   brittle — it is asserting something false.
@@ -45,8 +48,11 @@ Run the same model on `.cpuOnly`, `.cpuAndGPU`, `.cpuAndNeuralEngine`, and
 question "which is right?" is replaced by "do they agree?", and disagreement is
 a defect regardless of which path is wrong.
 
-`.cpuOnly` is the anchor (SPEC §2.3): deterministic, so every comparison has a
-single stable referent and failures point somewhere specific.
+`.cpuOnly` is the anchor (SPEC §2.3), so every comparison has a single stable
+referent and failures point somewhere specific. It is privileged as the
+simplest dispatch path least likely to change under a runtime update, not
+because it is uniquely deterministic: F-008 found all four paths deterministic
+on this configuration.
 
 This is the highest-value mechanism in the suite. It requires no labels, no
 reference framework, and it targets a real, hard bug class — the one a runtime
@@ -145,15 +151,17 @@ to differ. It is also a real bug class that finds real bugs.
 
 ### 4.3 Thresholds are measured, not chosen
 
-Every ⟨measure⟩ below is filled from Day 3's variance study: run a fixed input
-N times per compute unit, take the observed spread, and **set the threshold
-above the noise floor rather than at a round number**.
+Thresholds come from the measurement that matches the failure mode. For
+cross-unit comparisons, first run a fixed input N times per unit to establish
+the noise floor, then measure the distribution across many inputs. The F-008
+noise-floor study is complete and found zero spread; remaining ⟨measure⟩ entries
+need either representative real inputs or the unfinished compute-plan study.
 
 | Threshold | Value | Source |
 |---|---|---|
 | **Run-to-run noise floor** | **0.0** — all four units bit-identical | F-008, 20 repeats/unit |
-| fp32 parity `atol` | ⟨measure⟩ — observed 2e-6 | F-006, n=1; needs n≫1 |
-| fp16 `l1Mean` max | ⟨measure⟩ — observed 0.0113 | F-006, n=1; needs n≫1 |
+| fp32 parity mixed tolerance | ⟨measure⟩ — F-009's largest per-input L1 mean was 3.54e-6, but it did not collect elementwise max at scale | F-009, n=200 across two distributions; needs real inputs and the matching metric |
+| fp16 `l1Mean` max | ⟨measure⟩ — synthetic mean 0.0117–0.0132, max 0.0203 | F-009, n=200 across two distributions; needs real inputs |
 | ANE-vs-CPU `l1Mean` max | **0.030** | F-008 p95 0.0218, max 0.0242 → ~25% headroom |
 | GPU-vs-CPU `l1Mean` max | **0.020** | F-008 p95 0.0124, max 0.0149 → ~35% headroom |
 | ANE-vs-CPU `cosineSimilarity` min | **0.9990** | F-008 min observed 0.999574 |

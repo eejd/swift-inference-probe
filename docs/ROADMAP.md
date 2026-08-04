@@ -5,8 +5,8 @@ what we validate and why is in [`TEST_STRATEGY.md`](TEST_STRATEGY.md).
 
 The sequencing principle: **experiments that produce measurements come before
 infrastructure that reports them.** Thresholds in `TEST_STRATEGY.md` are derived
-from measured variance, so the measurements have to exist first — every
-⟨measure⟩ marker is a dependency on a milestone below.
+from measured data, so the measurements have to exist first — each remaining
+⟨measure⟩ marker is a dependency on an unfinished milestone below.
 
 ---
 
@@ -47,6 +47,20 @@ pip install torch torchvision coremltools numpy pillow
 pip freeze > python/requirements.txt   # pinning is mandatory — SPEC §5
 ```
 
+The environment already exists on the machine of record; normal startup does
+not recreate or reinstall it:
+
+```bash
+cd /Users/weihantu/InferenceProbe/python
+conda activate inferenceprobe
+python --version                       # expected: 3.12.13
+```
+
+If a new zsh session does not recognize `conda activate`, run
+`source /Users/weihantu/miniforge3/etc/profile.d/conda.sh` first. The separate
+`inferenceprobe-torch27` environment is a controlled comparison for F-010, not
+the normal development environment. Run `conda deactivate` when finished.
+
 ---
 
 ## Milestones
@@ -65,10 +79,11 @@ recording resolved versions and host chip. Both precisions matter: coremltools
 defaults to fp16, so the fp32 export is what makes the fp16 delta attributable
 (SPEC §2.4).
 
-Produced two findings: a **SIGSEGV in `ct.convert()`** (F-005, worked around) and
-a first drift measurement (F-006, n=1, preliminary).
+Produced two findings: a native crash in `ct.convert()` (F-005), later traced to
+GIL mishandling and worked around, and a first drift measurement (F-006, n=1,
+preliminary).
 
-### M2 — The two core experiments
+### M2 — The two core experiments · ✅ done
 
 1. **fp16 drift vs. the PyTorch reference.** Measure L1 against the PyTorch
    fp32→fp16 baseline. Reference figures from
@@ -82,22 +97,32 @@ a first drift measurement (F-006, n=1, preliminary).
 Experiment 2 does not depend on that issue existing, and is the more valuable of
 the two. It is not gated on experiment 1 succeeding.
 
-### M3 — Localization and variance
+**Result.** The fp16 direction reproduced, but at **1.51–1.70×** the PyTorch
+fp16 baseline across two synthetic input distributions rather than #2625's
+2.39×. Input distribution and torch version were eliminated as explanations;
+hardware/OS remains the leading explanation but cannot be proven on this
+machine (F-006, F-009, F-010). The compute-unit differential ran over 200
+inputs: every path had a zero repeat-run noise floor, while CPU-vs-ANE changed
+top-1 on 3/200 synthetic inputs (F-008).
 
-- `MLModelComparator` op localization **swept across `atol`**, to find where the
-  answer stabilizes (`TEST_STRATEGY.md` §4.5).
-- `MLComputePlan` → ANE residency, setting the §5.3 threshold.
-- **Run-to-run variance on a fixed input**, per compute unit. This is what fills
-  every ⟨measure⟩ threshold.
+### M3 — Localization and variance · ⏳ partial
 
-### M4 — Swift test suite
+- ⏳ `MLModelComparator` op localization **swept across `atol`**, to find where
+  the answer stabilizes (`TEST_STRATEGY.md` §4.5).
+- ⏳ `MLComputePlan` → ANE residency, setting the §5.3 threshold.
+- ✅ **Run-to-run variance on a fixed input**, per compute unit: zero maximum
+  spread across 20 repeats for all four units (F-008).
+- ⏳ `MLModelValidator` NaN/Inf scan, closing the last pending Day-3
+  investigation.
+
+### M4 — Swift test suite · next
 
 `ModelRunner`, `TolerancePolicy`, `GoldenStore`. The model-validation targets
 from SPEC §3 — `ParityTests`, `ComputeUnitTests`, `MetamorphicTests`,
 `RobustnessTests`, `PerformanceTests` — land here. Failure messages must name the
 offending layer, not report that outputs differ.
 
-### M5 — CI
+### M5 — CI · not started
 
 GitHub Actions on `macos-15`, PR gate under the 5-minute budget from
 `TEST_STRATEGY.md` §6, `.xcresult` posted as a readable PR check. Uses

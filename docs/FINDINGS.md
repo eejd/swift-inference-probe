@@ -3,9 +3,11 @@
 Every real discrepancy the harness caught, with the layer, the magnitude, the
 compute path, and a judgement on whether it is acceptable.
 
-**As of 1 Aug 2026 there are no inference findings yet** — the harness does not
-run. What follows is the environment record, without which no later number means
-anything, plus the toolchain findings from the Day-1 gate.
+**As of 3 Aug 2026 the repository has ten findings.** F-001–F-004 establish the
+toolchain and runner, F-005 isolates a coremltools native crash, and F-006–F-010
+record the fp16 and compute-unit experiments. The reusable Swift validation
+harness is still largely unimplemented, but the Python experiments run and
+their result JSON is committed.
 
 Entry format: what was observed · how it was measured · **judgement**. A finding
 without a judgement is an observation, not a finding.
@@ -91,7 +93,10 @@ had the gate not run first. Resolved by pinning a dedicated conda env at 3.12
 rather than installing into `base` — see [`ROADMAP.md`](ROADMAP.md) §Environment. This
 is also *why* `requirements.txt` is pinned rather than floating: the experimental
 coremltools debugging utilities this project depends on are version-sensitive
-(SPEC §5). **Resolution: pending.**
+(SPEC §5). **Resolution: fixed.** The primary `inferenceprobe` environment is
+Python 3.12.13 with the exact versions in `python/requirements.txt`; the isolated
+`inferenceprobe-torch27` environment exists only for F-010's version-comparison
+arm.
 
 ---
 
@@ -518,17 +523,17 @@ this machine cannot provide.
 
 ---
 
-## Pending investigations
+## Investigation status
 
-Each resolves to a finding entry, including the negative results — *"could not
-reproduce on this configuration"* is a finding, and given the hardware-dependence
-claim in #2625, an informative one.
+Each investigation resolves to a finding entry, including negative results.
+*"Could not reproduce at the reported magnitude on this configuration"* is a
+finding, especially when the upstream report claims hardware dependence.
 
-| # | Question | Day |
+| # | Question | Status |
 |---|---|---|
-| 1 | Does #2625's fp16 L1 drift (0.0394 vs. 0.0165) reproduce on M4 Pro / macOS 26.5.2? | 2 |
-| 2 | What fraction of inputs disagree between `.cpuOnly` and `.cpuAndNeuralEngine`, and by how much? | 2 |
-| 3 | Where does `MLModelComparator` op localization stabilize under an `atol` sweep? | 3 |
-| 4 | Run-to-run variance on a fixed input, per compute unit — the basis for every threshold | 3 |
-| 5 | What ANE residency does MobileNetV3-Large actually achieve? | 3 |
-| 6 | Any NaN/Inf-producing ops via `MLModelValidator`? | 3 |
+| 1 | Does #2625's fp16 L1 drift (0.0394 vs. 0.0165) reproduce on M4 Pro / macOS 26.5.2? | **Characterized** — direction yes, magnitude no; two confounds eliminated (F-006, F-009, F-010) |
+| 2 | What fraction of inputs disagree between `.cpuOnly` and `.cpuAndNeuralEngine`, and by how much? | **Complete** — 3/200 top-1 flips on synthetic inputs, with the full distribution in F-008 |
+| 3 | Where does `MLModelComparator` op localization stabilize under an `atol` sweep? | **Pending** |
+| 4 | Run-to-run variance on a fixed input, per compute unit | **Complete** — zero maximum spread across 20 repeats/unit (F-008) |
+| 5 | What ANE residency does MobileNetV3-Large actually achieve? | **Pending** |
+| 6 | Any NaN/Inf-producing ops via `MLModelValidator`? | **Pending** |
