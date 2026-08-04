@@ -39,6 +39,9 @@ import coremltools as ct
 
 from export_model import drift  # same statistics as the exporter, by construction
 
+# Repository-relative, not cwd-relative — see export_model.py and F-011.
+FIXTURES = Path(__file__).resolve().parent.parent / "Fixtures" / "models"
+
 SEED = 0
 INPUT_SHAPE = (1, 3, 224, 224)
 INPUT_NAME = "input"
@@ -93,8 +96,8 @@ def summarise(values: list[float]) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--n", type=int, default=100)
-    ap.add_argument("--models-dir", default="../Fixtures/models")
-    ap.add_argument("--out", default="../Fixtures/models/repro_2625.json")
+    ap.add_argument("--models-dir", default=str(FIXTURES))
+    ap.add_argument("--out", default=str(FIXTURES / "repro_2625.json"))
     args = ap.parse_args()
 
     md = Path(args.models_dir)

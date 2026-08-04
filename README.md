@@ -20,8 +20,9 @@ M4/M5 are not implemented yet. See:
 ## Python quick start
 
 The primary conda environment is already installed on the development machine.
-Activate it and run scripts from `python/`, because their default paths are
-relative to that directory:
+Activate it and run the scripts from `python/` so the bare script names resolve.
+Their default input and output paths are anchored to the repository itself, so
+they read and write `Fixtures/models/` no matter where they are invoked from:
 
 ```bash
 cd /Users/weihantu/InferenceProbe/python

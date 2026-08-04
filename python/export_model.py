@@ -33,6 +33,13 @@ import torchvision
 
 import coremltools as ct
 
+# Defaults resolve against the repository, not the current directory. These
+# defaults used to be "../Fixtures/models", which silently wrote a parallel tree
+# into the repository's *parent* whenever a script was invoked from the repo root
+# (docs/FINDINGS.md F-011). An explicitly passed --flag is still cwd-relative,
+# which is what an explicit override should be.
+FIXTURES = Path(__file__).resolve().parent.parent / "Fixtures" / "models"
+
 # Fixed so the reference input is byte-identical across runs and machines.
 # Every drift number below is relative to this exact tensor.
 SEED = 0
@@ -148,7 +155,7 @@ def drift(reference: np.ndarray, actual: np.ndarray) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--model", default="mobilenet_v3_large")
-    ap.add_argument("--output-dir", default="../Fixtures/models")
+    ap.add_argument("--output-dir", default=str(FIXTURES))
     args = ap.parse_args()
 
     out = Path(args.output_dir).resolve()

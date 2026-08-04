@@ -3,11 +3,12 @@
 Every real discrepancy the harness caught, with the layer, the magnitude, the
 compute path, and a judgement on whether it is acceptable.
 
-**As of 3 Aug 2026 the repository has ten findings.** F-001–F-004 establish the
-toolchain and runner, F-005 isolates a coremltools native crash, and F-006–F-010
-record the fp16 and compute-unit experiments. The reusable Swift validation
-harness is still largely unimplemented, but the Python experiments run and
-their result JSON is committed.
+**As of 4 Aug 2026 the repository has eleven findings.** F-001–F-004 establish
+the toolchain and runner, F-005 isolates a coremltools native crash, F-006–F-010
+record the fp16 and compute-unit experiments, and F-011 establishes that those
+experiments reproduce byte-for-byte from a fresh export. The reusable Swift
+validation harness is still largely unimplemented, but the Python experiments
+run and their result JSON is committed.
 
 Entry format: what was observed · how it was measured · **judgement**. A finding
 without a judgement is an observation, not a finding.
@@ -520,6 +521,63 @@ an inherited assumption until now and is now evidence-backed.
 versus 26.1, or the specific fixture the issue reporter used — could account for
 it. Confirming would need the same script run on an M1, which is the one thing
 this machine cannot provide.
+
+---
+
+## F-011 · Export is numerically reproducible; the package around it is not
+
+**Observed.** `export_model.py` was re-run accidentally on 4 Aug, two days after
+the export of record and from a different working directory. Comparing the two
+exports splits cleanly into two halves: everything numerical is identical, and
+everything about the container is not.
+
+**Measured.** Fresh export (4 Aug 04:28 UTC) against the committed export
+(2 Aug 08:42 UTC) — same machine, same seed, same `inferenceprobe` environment,
+unchanged code:
+
+| Artifact | Result |
+|---|---|
+| `weight.bin`, fp16 (10,951,440 B) | **byte-identical** |
+| `weight.bin`, fp32 (21,892,672 B) | **byte-identical** |
+| `mobilenet_v3_large.drift.json` | **byte-identical** |
+| `compute_unit_differential.json` | **byte-identical** |
+| `repro_2625.json` | **byte-identical** |
+| `model.mlmodel` | differs from byte 119; same 116,395 B |
+| `Manifest.json` | differs — UUIDs regenerated per export |
+| `*.manifest.json` | differs in `exported_at` only, by construction |
+
+The `model.mlmodel` difference is an embedded **local-date stamp**
+(`2026-08-02` vs `2026-08-03`) plus metadata key reordering. No weight or op
+payload changed.
+
+**Judgement.** Two results, and the second is the actionable one.
+
+**1. Determinism holds far wider than F-008 established.** F-008 measured zero
+spread across 20 consecutive predictions *inside one process*. This extends the
+claim across separate processes, separate days, and a full re-conversion:
+`torch.jit.trace` → `ct.convert` → fp16 quantization is byte-reproducible on a
+fixed seed and environment. Every figure in F-006 through F-009 is now
+independently reproduced from source rather than re-read from a committed file.
+
+**2. Golden identity must not be a digest of the `.mlpackage`.** The golden
+manifest in SPEC §4.6 currently records `producedBy` but no model identity. One
+is needed — a golden has to be invalidated when the model genuinely changes —
+and the obvious implementation, hashing the `.mlpackage`, is **wrong**: fresh
+UUIDs and a date stamp change that hash on every export while the numerics are
+identical. It would invalidate every golden on every re-export, and the failure
+would look exactly like a real model change. The stable identity is a digest
+over `weight.bin` plus a metadata-stripped spec, or over reference outputs
+directly. Cheap to know now; a confusing afternoon during M4 otherwise.
+
+**Scope.** Same machine, same seed, same environment, same code. This is
+*reproducibility*, not *portability* — it says nothing about whether another
+host produces the same weights. That is the F-010 question and it remains open.
+
+**Resolution: cause fixed** 4 Aug. The scripts resolved their default paths
+against the current directory, so invoking them from the repository root wrote a
+complete 32 MB parallel tree into the repository's *parent*. Defaults now
+resolve against `__file__`, so they land in the repository regardless of where
+they are invoked from. The stray tree was verified redundant and removed.
 
 ---
 

@@ -92,8 +92,11 @@ to test plans later is mechanical.
 
 ### Starting the Python environment
 
-Run the scripts from `python/`, because their default input and output paths are
-relative to that directory:
+Run the scripts from `python/` so the bare `python export_model.py` form
+resolves. Their default input and output paths are anchored to the repository
+via `__file__`, so they read and write `Fixtures/models/` regardless of the
+working directory (F-011); an explicitly passed `--output-dir` is still
+cwd-relative:
 
 ```bash
 cd /Users/weihantu/InferenceProbe/python

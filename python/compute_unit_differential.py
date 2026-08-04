@@ -33,6 +33,9 @@ import torch
 
 import coremltools as ct
 
+# Repository-relative, not cwd-relative — see export_model.py and F-011.
+FIXTURES = Path(__file__).resolve().parent.parent / "Fixtures" / "models"
+
 SEED = 0
 INPUT_SHAPE = (1, 3, 224, 224)
 INPUT_NAME = "input"
@@ -77,10 +80,10 @@ def summarise(values: list[float]) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--model", default="../Fixtures/models/mobilenet_v3_large.fp16.mlpackage")
+    ap.add_argument("--model", default=str(FIXTURES / "mobilenet_v3_large.fp16.mlpackage"))
     ap.add_argument("--n", type=int, default=200, help="inputs for the differential")
     ap.add_argument("--repeats", type=int, default=20, help="repeats for the noise floor")
-    ap.add_argument("--out", default="../Fixtures/models/compute_unit_differential.json")
+    ap.add_argument("--out", default=str(FIXTURES / "compute_unit_differential.json"))
     args = ap.parse_args()
 
     print(f"loading {Path(args.model).name} on {len(UNITS)} compute units ...")

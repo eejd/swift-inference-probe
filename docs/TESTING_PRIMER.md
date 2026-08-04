@@ -122,6 +122,36 @@ That table is what a defect report should look like. Compare it to "fp16 export
 crashes." One of those a maintainer can act on; the other starts a long
 conversation.
 
+**Bisection localises; it does not explain.** The table says *where* the bug
+lives, which was enough to work around it — but not *why* a `predict()` should
+poison a later `convert()`. The explanation arrived from a second environment
+built for an unrelated reason (Step 7). The identical sequence on torch 2.7.0
+aborts with a message rather than dying silently:
+
+| Environment | Exit | Signal |
+|---|---|---|
+| torch 2.13.0 | 139 | SIGSEGV — raw memory fault, no message |
+| torch 2.7.0 | 134 | SIGABRT, with a diagnostic |
+
+```
+Fatal Python error: PyEval_SaveThread: the function must be called with the GIL
+held … but the GIL is released
+```
+
+The root cause is **GIL mishandling in coremltools' native extension**, not
+memory corruption: something releases Python's global lock and then re-enters a
+path that assumes it still holds it. That is exactly why the bug is an
+interaction — `predict()` leaves the interpreter's thread state in a condition
+that `convert()`'s implicit model-load path mishandles.
+
+Two things generalise. **A crash that talks is worth more than a crash that does
+not**, so reproducing a native fault in a second environment is often cheaper
+than debugging it in the first. And the fix the bisection produced —
+`skip_model_load=True` — was **correct independently of the bug**: the implicit
+load it removes uses `ComputeUnit.ALL`, which is not the pinned `.cpuOnly`
+reference anchor [`SPEC.md`](SPEC.md) §2.3 requires. Working around the defect
+corrected a real design error.
+
 ### Step 5 — Measure the noise before setting any threshold
 
 This step is the one most often skipped, and here it changed a conclusion.
@@ -154,9 +184,80 @@ this hardware it is false. The spec was corrected and the reason recorded.
 **1.5% of inputs produce a different predicted class on the Neural Engine than on
 the CPU.** Same file, same weights, same input.
 
+Two structural observations came out of the same experiment (F-007, at n=1, and
+confirmed by the table above), and both changed where the project points its
+effort.
+
+**The compute path moves the output more than the precision change does.** The
+ANE-vs-CPU disagreement of 0.0189 is larger than the entire fp16 conversion
+drift of 0.0113 (F-006). fp16 is the famous problem; on this model it is the
+smaller term. **Test the effect you measured, not the one you expected** — which
+is why the differential suite, not the fp16 suite, is where the value is.
+
+**`.all` is bit-identical to `.cpuAndNE`**, so Core ML dispatches this model to
+the Neural Engine when given a free choice. That does not make testing both
+redundant: **the equality is itself the assertion.** Some invariants are worth
+asserting precisely because you expect them to hold — the day `.all` stops
+matching `.cpuAndNE`, dispatch has changed underneath you, and nothing else in
+the suite would have said so.
+
+### Step 7 — Name the alternative explanations, then close them one at a time
+
+The first drift measurement came in at **1.78×** where the published issue
+reported **2.39×** (F-006). The honest reading of that is neither "reproduced"
+nor "failed to reproduce". It is: *three things differ between this machine and
+that one, and this measurement separates none of them.*
+
+| Confound | Status |
+|---|---|
+| **Input distribution** — synthetic noise vs. real photographs | closed, F-009 |
+| **torch version** — 2.13.0 vs 2.7.0 | closed, F-010 |
+| **Chip / OS** — M4 Pro / macOS 26.5.2 vs M1 / 26.1 | open, not testable here |
+
+Writing that table is most of the work. Once the alternatives are named, each
+one stops being a doubt and becomes a finite experiment.
+
+**Input distribution (F-009).** White noise is off-distribution for a network
+trained on photographs, and **L1 is not scale-free** — if logit magnitudes move,
+L1 moves with them. So `python/repro_2625.py` generates a second input set with
+a **1/f^1.2 power spectrum**: the spatial statistic that separates photographs
+from static, where energy sits at low frequencies and neighbouring pixels
+correlate.
+
+| | white noise | natural 1/f | issue #2625 |
+|---|---|---|---|
+| Core ML fp16 L1 | 0.011749 | 0.013184 | 0.0394 |
+| PyTorch fp16 L1 | 0.006923 | 0.008707 | 0.0165 |
+| **ratio** | **1.70×** | **1.51×** | **2.39×** |
+| mean logit \|max\| | **5.38** | **6.52** | — |
+
+Read the last row before the others — §4.5 explains why. Then the result: the
+ratio moved *away* from 2.39×, not toward it. Input distribution is eliminated,
+and eliminated in the stronger direction, since more photograph-like inputs
+would be expected to lower it further still.
+
+**torch version (F-010).** A second environment pinned torch 2.7.0 — the version
+the issue was filed against, and the newest coremltools 9.0 claims to have
+tested. Every number came back **bit-identical**: the two result files differ
+nowhere at all, and the manifests differ only in the version strings they
+record.
+
+**What remains.** By elimination the discrepancy is attributable to hardware or
+OS — which is independently what the issue thread argues, from a different
+direction, on a different chip. Two routes to one answer are worth more than
+either alone. It also converts [`TEST_STRATEGY.md`](TEST_STRATEGY.md) §4.4 —
+tolerance is a function of the host chip — from an inherited assumption into an
+evidence-backed one.
+
+**And elimination is not proof.** A fourth unconsidered variable — the
+deployment target, the Core ML runtime shipped with one OS versus another, the
+reporter's own fixture — could still account for it. That caveat belongs in the
+finding rather than smoothed out of it, because a conclusion by elimination is
+only ever as strong as the list of alternatives somebody thought to write down.
+
 ---
 
-## 4. Four lessons that generalise
+## 4. Six lessons that generalise
 
 ### 4.1 Choosing the metric *is* the test design
 
@@ -203,6 +304,40 @@ The zero noise floor from F-008 matters here too: these differential tests
 **cannot flake for numerical reasons**, so tolerances can be tight rather than
 padded defensively.
 
+### 4.5 A negative result is a result — if the manipulation is checked
+
+F-009 reproduced nothing. It is still one of the more useful measurements in the
+repository, because it permanently removed one of three explanations, and did so
+in the direction that argues *against* the hypothesis rather than merely failing
+to support it.
+
+But a null result is only interpretable if you can show your manipulation did
+something. Otherwise *"input distribution doesn't matter"* is indistinguishable
+from *"my generator didn't actually change the inputs"* — and those two have
+opposite implications.
+
+That is what the `logit |max|` row is for: **5.38 → 6.52**. The two input sets
+demonstrably put the network at different operating points, so the flat ratio is
+evidence about the world rather than evidence about the experiment.
+
+**Report the manipulation check next to the null result, always.** Without one, a
+negative finding is unfalsifiable, and unfalsifiable findings persuade nobody who
+is paying attention.
+
+### 4.6 "Expected" is not "verified"
+
+The torch-version elimination (F-010) is obvious in hindsight — torch's job ends
+at tracing the graph, and the arithmetic is Core ML's. It was worth twenty
+minutes anyway, for two reasons.
+
+coremltools itself warns that the installed pairing is untested, which makes it a
+live objection anyone could raise against every number in this repository. And
+the environment built to settle it is what then produced the diagnostic that
+root-caused a crash open since Step 4.
+
+Cheap eliminations are worth running even when you are confident of the outcome.
+Confidence is not a measurement, and the byproducts are frequently the point.
+
 ---
 
 ## 5. Vocabulary
@@ -216,6 +351,9 @@ padded defensively.
 | **Tolerance policy** | The documented rule for how much drift is acceptable, and measured how |
 | **Noise floor** | The system's disagreement with itself; the lower bound on what any threshold can detect |
 | **Control** | A variant included to isolate one variable — here, the fp32 export |
+| **Confound** | An alternative explanation for a result that the experiment cannot rule out |
+| **Manipulation check** | Evidence that the variable you meant to change actually changed |
+| **Elimination** | Localising a cause by closing every alternative you can name |
 | **Flake** | A test that both passes and fails on identical input |
 | **Quarantine** | Keeping a known-bad test running and reporting without failing the build |
 | **Test validity** | Whether a test measures what it claims to measure |
