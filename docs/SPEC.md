@@ -158,11 +158,22 @@ and the harness records the host chip in every result.
 ## 3. Target repo layout
 
 This is the intended M4/M5 layout, not a claim that every file exists today.
-As of 3 Aug, the Swift side contains `HostEnvironment.swift` and
-`HarnessTests`; the Python side contains `export_model.py`,
-`compute_unit_differential.py`, and `repro_2625.py`. Generated model packages
-are local and ignored, while their manifests and measurement JSON are tracked
-under `Fixtures/models*`.
+
+As of 4 Aug the Swift side has `HostEnvironment`, `TolerancePolicy`,
+`ComparisonResult`, `TensorComparison`, `ModelRunner`, and `Fixtures`, with
+`HarnessTests`, `ComputeUnitTests`, and `RobustnessTests` green.
+`GoldenStore`, `MetamorphicRelation`, `Metrics`, `ParityTests`,
+`MetamorphicTests`, and `PerformanceTests` are the remaining M4 work. The
+Python side has all six experiment scripts. Generated model packages are local
+and ignored, while their manifests and measurement JSON are tracked under
+`Fixtures/models*`.
+
+**Suites that need a model must skip, not fail, when it is absent.** The
+`.mlpackage` files are gitignored (large, and byte-reproducible — F-011), so
+they exist on a development machine and not on a fresh clone or cold CI runner.
+`ComputeUnitTests` and `RobustnessTests` gate on
+`.enabled(if: Fixtures.modelsAvailable)` and name the regeneration command in
+the skip message.
 
 ```
 InferenceProbe/
@@ -292,21 +303,35 @@ public struct ComparisonResult: Sendable {
 ### 4.4 `ModelRunner`
 
 ```swift
-public struct ModelRunner: Sendable {
-    public enum Precision: String, Sendable { case fp32, fp16 }
+public struct ModelRunner {                       // not Sendable — see below
+    public enum Precision: String, Sendable, CaseIterable { case fp32, fp16 }
 
-    public init(modelURL: URL, computeUnits: MLComputeUnits) throws
+    /// async: compiling the .mlpackage is an await.
+    public init(modelURL: URL, computeUnits: MLComputeUnits) async throws
 
-    public func predict(_ input: MLFeatureProvider) throws -> MLFeatureProvider
+    /// Returns [Double] rather than MLFeatureProvider: every comparison in
+    /// TolerancePolicy is double-precision, so widening once here keeps the
+    /// fp16/fp32 distinction out of the comparison code.
+    public func predict(_ values: [Double],
+                        inputName: String, outputName: String) throws -> [Double]
 
     /// Cold = compile from .mlpackage; warm = load cached .mlmodelc.
     /// These are distinct and commonly-conflated costs.
-    public func measureLoad(cold: Bool) throws -> Duration
-
-    /// Op-to-device assignment from MLComputePlan.
-    public func computePlan() async throws -> ComputePlanSummary
+    public static func measureLoad(modelURL: URL, computeUnits: MLComputeUnits,
+                                   cold: Bool) async throws -> Duration
 }
 ```
+
+**Corrected 4 Aug — `ModelRunner` is not `Sendable`.** `MLModel` does not
+conform under Swift 6 strict concurrency, so the original signature does not
+compile. Marking the wrapper `@unchecked Sendable` would assert thread safety
+this project has not measured, and [`TEST_STRATEGY.md`](TEST_STRATEGY.md) §5.1
+lists concurrent `prediction()` as a Tier 1 test precisely because it is not yet
+established. The conformance can be added once that test exists and passes.
+
+`computePlan()` is not implemented on the Swift side yet — `MLComputePlan` is
+covered from Python in `compute_plan.py`, and F-014 answered the residency
+question it existed to answer.
 
 ### 4.5 `ComputePlanSummary`
 

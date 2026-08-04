@@ -3,15 +3,16 @@
 Every real discrepancy the harness caught, with the layer, the magnitude, the
 compute path, and a judgement on whether it is acceptable.
 
-**As of 4 Aug 2026 the repository has fourteen findings.** F-001–F-004 establish
+**As of 4 Aug 2026 the repository has fifteen findings.** F-001–F-004 establish
 the toolchain and runner, F-005 isolates a coremltools native crash, F-006–F-010
 record the fp16 and compute-unit experiments, F-011 establishes that those
 experiments reproduce byte-for-byte from a fresh export, F-012 localizes both
 the precision and compute-unit divergence to a specific op, F-013 shows the
-NaN/Inf gate is blind to the failure mode that actually occurs, and F-014 reads
-dispatch off the compute plan and confirms the inference F-007 left open. The
-reusable Swift validation harness is still largely unimplemented, but the Python
-experiments run and their result JSON is committed.
+NaN/Inf gate is blind to the failure mode that actually occurs, F-014 reads
+dispatch off the compute plan and confirms the inference F-007 left open, and
+F-015 puts the NaN sanitization in Core ML rather than in coremltools. The
+Python experiments all run with their result JSON committed, and the Swift
+harness now covers the compute-unit differential and the robustness battery.
 
 Entry format: what was observed · how it was measured · **judgement**. A finding
 without a judgement is an observation, not a finding.
@@ -772,13 +773,12 @@ ones. That is the same conclusion F-007 reached from the opposite direction.
 
 **Caveats.** Two, and the first is a genuine open question.
 
-**Where the sanitization happens is not determined by these measurements.** It
-could be the coremltools Python wrapper conditioning the array before dispatch,
-the Core ML framework, or a per-backend compiler. The compute-unit differences
-argue against a single pre-dispatch scrub, and `.cpuAndNE` emitting Inf shows
-the stack *can* return non-finite values — but neither is conclusive. Driving
-the same inputs through the Swift `ModelRunner` in M4 would separate the Python
-wrapper from the framework, and that is the experiment to run next.
+~~**Where the sanitization happens is not determined by these measurements.**~~
+**Resolved by F-015.** Driving the same inputs through Swift, which touches
+`CoreML.framework` directly and never goes near coremltools, produced *identical*
+values. The sanitization is in Core ML or below, not in the Python wrapper — so
+every consequence below applies to shipped Swift code, not only to these
+experiments.
 
 **n = 1 base input.** The magnitude sweep scales one seeded tensor. Thresholds
 like "fp16 collapses near 1e3" are properties of this input's activation
@@ -867,6 +867,56 @@ unsupported op would partition, and that is the case where a residency
 `MLComputePlan.load_from_path` requires a compiled `.mlmodelc` — handing it an
 `.mlpackage` aborts the process with an uncaught C++ exception rather than a
 Python error.
+
+---
+
+## F-015 · The NaN sanitization is in Core ML, not in coremltools' Python wrapper
+
+**The experiment F-013 named, run.** `Tests/RobustnessTests/MalformedInputTests.swift`.
+
+F-013 found Core ML returning a confident finite answer for all-NaN and all-Inf
+input where PyTorch propagates NaN, and could not say **where** that happens:
+the coremltools Python wrapper conditioning the array before dispatch, the
+Core ML framework, or a backend compiler. It named driving the same inputs
+through Swift as the experiment that separates them, because the Swift path
+touches `CoreML.framework` directly and never goes near coremltools.
+
+**Measured.** Same `.mlpackage`, same `.cpuOnly`, all-NaN and all-Inf inputs,
+Python via coremltools against Swift via `MLModel.prediction(from:)`:
+
+| Input | precision | Python (F-013) | Swift |
+|---|---|---|---|
+| all NaN | fp32 | top-1 904, \|max\| 6.592 | top-1 904, \|max\| **6.592** |
+| all NaN | fp16 | top-1 904, \|max\| 6.516 | top-1 904, \|max\| **6.516** |
+| all +Inf | fp32 | top-1 904, \|max\| 6.592 | top-1 904, \|max\| **6.592** |
+| all +Inf | fp16 | top-1 904, \|max\| 6.516 | top-1 904, \|max\| **6.516** |
+
+Not merely both finite — **the same values**, to every digit reported, from two
+clients with no code in common below the framework.
+
+**Judgement.** **The coremltools Python wrapper is exonerated.** The
+sanitization lives in Core ML itself or below it, so it is a property of the
+deployment runtime rather than an artifact of the development tooling. That is
+the worse of the two possible answers, and the one that matters: a shipped app
+written in Swift gets exactly the behaviour F-013 described. Every consequence
+F-013 drew — the Tier 1 NaN/Inf gate being a weak necessary condition, a
+pipeline bug returning a plausible class instead of a failure — applies to
+production and not just to the Python experiments.
+
+It also retires the caveat F-013 recorded. The open question was which layer,
+and the answer is "not the layer we could have worked around."
+
+**Method note.** The malformed inputs are what make this comparison exact.
+All-NaN and all-Inf are the same tensor regardless of how they were generated,
+so Python and Swift genuinely fed the model identical bytes. The *nominal* rows
+are not comparable that way — Swift's seeded generator is not `torch.rand`, so
+those inputs differ by construction and only their distribution is shared. This
+is recorded in `Fixtures.normalizedInput`, and it is why an exact cross-language
+parity test needs a committed input tensor rather than a regenerated one.
+
+**Caveat.** `.cpuOnly` on one model. F-013 found `fp16` + `.cpuAndNE` to be the
+one configuration that does emit Inf, and this comparison did not repeat the
+full unit matrix in Swift.
 
 ---
 

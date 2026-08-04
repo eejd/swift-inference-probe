@@ -122,12 +122,26 @@ top-1 on 3/200 synthetic inputs (F-008).
   the failure mode that actually occurs, so TEST_STRATEGY §5.1 gained a
   finite-but-implausible check (F-013).
 
-### M4 — Swift test suite · next
+### M4 — Swift test suite · ⏳ partial
 
-`ModelRunner`, `TolerancePolicy`, `GoldenStore`. The model-validation targets
-from SPEC §3 — `ParityTests`, `ComputeUnitTests`, `MetamorphicTests`,
-`RobustnessTests`, `PerformanceTests` — land here. Failure messages must name the
-offending layer, not report that outputs differ.
+- ✅ `TolerancePolicy` with the non-optional `rationale`, `ComparisonResult`
+  with a failure message that names criterion, worst coordinate, suspect ops
+  and host chip, and `TensorComparison` implementing the same seven statistics
+  as `drift()` in `export_model.py`.
+- ✅ `ModelRunner` — compiles an `.mlpackage`, pins a compute unit, predicts.
+  Not `Sendable`; see the correction in SPEC §4.4.
+- ✅ `ComputeUnitTests` — the differential against the `.cpuOnly` anchor, with
+  thresholds taken from F-008 rather than chosen, plus the `.all` ≡ `.cpuAndNE`
+  dispatch assertion F-014 justified and a zero-noise-floor check.
+- ✅ `RobustnessTests` — the malformed-input battery, which answered F-013's
+  open question and produced F-015.
+- ⏳ `GoldenStore` with `bless(_:as:reason:)`, and the committed input tensors
+  it needs. F-011 constrains the design: golden identity must not be a digest
+  of the `.mlpackage`.
+- ⏳ `ParityTests` against the PyTorch reference, `MetamorphicTests`,
+  `MetamorphicRelation`, `Metrics`, and `PerformanceTests` (XCTest).
+
+Failure messages must name the offending layer, not report that outputs differ.
 
 ### M5 — CI · not started
 
