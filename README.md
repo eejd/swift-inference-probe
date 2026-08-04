@@ -48,10 +48,46 @@ torch 2.7.0.
 environment is active, the implemented experiments are:
 
 ```bash
-python export_model.py
-python compute_unit_differential.py
-python repro_2625.py
+python export_model.py               # export fp32 + fp16, drift vs PyTorch   (F-005, F-006)
+python compute_unit_differential.py  # noise floor + 4 compute units, n=200   (F-007, F-008)
+python repro_2625.py                 # fp16 drift across input distributions  (F-009, F-010)
+python localize.py                   # which op diverges, swept across atol   (F-012)
+python validate.py                   # NaN/Inf scan + malformed-input battery (F-013)
 ```
+
+Each writes its result JSON into `Fixtures/models/`, and those files are
+committed — so the useful check is not just that a script runs but that it
+reproduces what is already there.
+
+`localize.py` is the slow one at roughly 15 minutes, because a strict `atol`
+makes it traverse the whole op graph. The rest are a few minutes or less. For a
+quick smoke run rather than a full measurement:
+
+```bash
+python localize.py --arm compute --atols 1e-2      # one arm, one tolerance
+python compute_unit_differential.py --n 20 --repeats 5
+python repro_2625.py --n 10
+python validate.py --units cpuOnly --no-torch-reference
+```
+
+Pass `--out` to any of them to write somewhere else and leave the committed
+fixtures alone.
+
+### Reproducing, rather than just running
+
+`compute_unit_differential.py`, `repro_2625.py`, and `localize.py` write no
+timestamps, so re-running them should reproduce the committed JSON byte for
+byte (F-011). That makes this a real end-to-end check:
+
+```bash
+python compute_unit_differential.py && python repro_2625.py
+git -C /Users/weihantu/InferenceProbe diff --stat Fixtures/    # expect: no output
+```
+
+`export_model.py` is the exception — it stamps `exported_at`, so re-running it
+always dirties the two manifest files even when every number is identical. Run
+it only when you actually need to regenerate the `.mlpackage` files, which are
+gitignored and therefore mandatory on a fresh clone before anything else works.
 
 Use `conda deactivate` when finished. `inferenceprobe-torch27` is an isolated
 comparison environment for finding F-010 and is not the normal development

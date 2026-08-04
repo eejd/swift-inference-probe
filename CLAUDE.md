@@ -126,10 +126,21 @@ torchvision 0.22.0 and should not replace the primary environment.
 After activation, the existing experiments are:
 
 ```bash
-python export_model.py
-python compute_unit_differential.py
-python repro_2625.py
+python export_model.py               # fp32 + fp16 export, drift vs PyTorch   (F-005, F-006)
+python compute_unit_differential.py  # noise floor + 4 compute units, n=200   (F-007, F-008)
+python repro_2625.py                 # fp16 drift across input distributions  (F-009, F-010)
+python localize.py                   # op localization swept across atol      (F-012)
+python validate.py                   # NaN/Inf scan + malformed-input battery (F-013)
 ```
+
+`localize.py` takes ~15 min because a strict `atol` traverses the whole op
+graph; `--arm compute --atols 1e-2` is the smoke-test form. All of them accept
+`--out` to avoid overwriting the committed fixtures.
+
+All except `export_model.py` write no timestamps, so re-running them should
+reproduce the committed JSON byte-for-byte and `git diff Fixtures/` is the
+check (F-011). `export_model.py` stamps `exported_at` and will always dirty the
+manifests, so run it only to regenerate the gitignored `.mlpackage` files.
 
 Run `pip freeze > requirements.txt` from `python/` after any intentional primary
 environment dependency change, because the coremltools debugging utilities are
