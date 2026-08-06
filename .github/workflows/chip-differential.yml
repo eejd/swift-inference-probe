@@ -1,0 +1,159 @@
+"on":
+  workflow_dispatch:
+  schedule:
+    # Weekly. This is an experiment, not a gate — nothing merges on its result.
+    - cron: "0 6 * * 1"
+
+name: Chip differential (second-silicon arm)
+
+# This workflow is not a test. It is the experiment F-010 said this project
+# could not run.
+#
+# F-006 measured Core ML's fp16 drift at 1.51-1.70x the PyTorch fp16 baseline
+# where coremltools #2625 reported 2.39x, and named three possible explanations.
+# F-009 eliminated input distribution. F-010 eliminated the torch version. What
+# remained was **chip / OS**, recorded as "Not testable on this machine —
+# confirming would need the same script run on different silicon."
+#
+# A GitHub macOS runner is different silicon. So this runs the same pinned code
+# on it and reports the numbers next to the committed M4 Pro ones.
+#
+# Two things make it feasible where a full suite would not be:
+#   - repro_2625.py uses **.cpuOnly exclusively**, so it does not depend on the
+#     Neural Engine being exposed inside Apple's Virtualization Framework —
+#     which is undocumented and quite possibly absent.
+#   - the repo is public, so standard-runner minutes are free and the macOS
+#     billing multiplier that shaped TEST_STRATEGY §6 does not apply.
+#
+# Whatever it reports is informative. Matching numbers weaken the hardware
+# explanation; differing numbers strengthen it; a missing Neural Engine is
+# itself a finding about what cloud CI can and cannot validate.
+
+jobs:
+  measure:
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record the host environment
+        run: |
+          {
+            echo "## Runner"
+            echo
+            echo '| | |'
+            echo '|---|---|'
+            echo "| chip | \`$(sysctl -n machdep.cpu.brand_string)\` |"
+            echo "| arch | \`$(uname -m)\` |"
+            echo "| cores | $(sysctl -n hw.ncpu) |"
+            echo "| memory | $(( $(sysctl -n hw.memsize) / 1073741824 )) GB |"
+            echo "| macOS | $(sw_vers -productVersion) ($(sw_vers -buildVersion)) |"
+            echo
+            echo "**Machine of record for every committed number: Apple M4 Pro / macOS 26.5.2.**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The pin is load-bearing, not hygiene: the coremltools debugging
+      # utilities are `experimental` and version-sensitive (SPEC §5). An
+      # unpinned install would make any difference from the M4 Pro numbers
+      # uninterpretable — the whole point is that only the chip differs.
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python/requirements.txt
+
+      - name: Export the model
+        working-directory: python
+        run: python export_model.py
+
+      # Cheap and decisive: does this runner expose a Neural Engine at all?
+      # F-014 measured 100% ANE residency at fp16 on the M4 Pro. A VM that
+      # reports 0% tells us cloud CI can never validate the ANE path, which
+      # bounds what any future gate here is allowed to claim.
+      - name: Compute plan — is there a Neural Engine in this VM?
+        working-directory: python
+        run: python compute_plan.py --out ../ci-results-compute-plan.json
+
+      # The F-010 arm. .cpuOnly only, so it does not need the ANE.
+      - name: Reproduce #2625 on this silicon
+        working-directory: python
+        run: python repro_2625.py --n 50 --out ../ci-results-repro-2625.json
+
+      - name: Compute-unit differential
+        working-directory: python
+        run: |
+          python compute_unit_differential.py --n 50 --repeats 10 \
+            --out ../ci-results-compute-unit.json
+
+      # The payoff: the runner's numbers beside the committed M4 Pro ones.
+      - name: Compare against the M4 Pro numbers
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+
+          def load(p):
+              try:
+                  return json.loads(pathlib.Path(p).read_text())
+              except Exception:
+                  return None
+
+          print("\n## fp16 drift ratio — #2625\n")
+          ref, new = load("Fixtures/models/repro_2625.json"), load("ci-results-repro-2625.json")
+          if ref and new:
+              print("| distribution | M4 Pro (committed) | this runner | issue #2625 |")
+              print("|---|---|---|---|")
+              for dist in ("white_noise", "natural_1_over_f"):
+                  a = ref.get(dist, {}).get("ratio_coreml_over_torch")
+                  b = new.get(dist, {}).get("ratio_coreml_over_torch")
+                  if a and b:
+                      print(f"| {dist} | {a:.2f}x | **{b:.2f}x** | 2.39x |")
+              print("\nF-010 eliminated input distribution and torch version, leaving "
+                    "chip/OS as the only surviving explanation for the gap to 2.39x. "
+                    "If this runner also lands near 1.5-1.7x, hardware alone does not "
+                    "account for it and a fourth variable is in play. If it lands "
+                    "nearer 2.39x, the hardware explanation is corroborated on a "
+                    "second chip.")
+          else:
+              print("_repro comparison unavailable — the export or the run failed._")
+
+          print("\n## ANE residency\n")
+          plan = load("ci-results-compute-plan.json")
+          if plan:
+              print("| config | device | ANE by op count | ANE by cost |")
+              print("|---|---|---|---|")
+              for key, run in plan.get("runs", {}).items():
+                  dev = "+".join(sorted(run.get("by_device", {}))) or "?"
+                  print(f"| {key} | {dev} | {run.get('ane_residency_by_op_count',0):.0%} "
+                        f"| {run.get('ane_residency_by_cost',0):.0%} |")
+              print("\nM4 Pro measured 100% ANE at fp16 and 0% at fp32 (F-014). "
+                    "0% here at fp16 means this VM exposes no Neural Engine, which "
+                    "would bound what cloud CI can ever assert about that path.")
+
+          print("\n## Compute-unit noise floor\n")
+          diff = load("ci-results-compute-unit.json")
+          if diff:
+              floors = {k: v.get("max_abs_spread") for k, v in diff.get("noise_floor", {}).items()}
+              allzero = all(v == 0.0 for v in floors.values())
+              print(f"Repeat-run spread per unit: `{floors}`\n")
+              print("**Zero on every unit, matching F-008.**" if allzero else
+                    "**Non-zero — this runner is NOT bit-reproducible run to run, "
+                    "unlike the M4 Pro. Every tight threshold in the suite assumes "
+                    "a zero floor (TEST_STRATEGY §4.3); on this silicon they would "
+                    "need widening.**")
+          PY
+
+      - name: Upload measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chip-differential-results
+          path: |
+            ci-results-*.json
+            Fixtures/models/*.drift.json
+            Fixtures/models/*.manifest.json
+          retention-days: 90

@@ -149,12 +149,31 @@ top-1 on 3/200 synthetic inputs (F-008).
 
 Failure messages must name the offending layer, not report that outputs differ.
 
-### M5 — CI · not started
+### M5 — CI · ⏳ written, not yet observed running
 
-GitHub Actions on `macos-15`, PR gate under the 5-minute budget from
-`TEST_STRATEGY.md` §6, `.xcresult` posted as a readable PR check. Uses
-`xcodebuild`, not `swift test` — only the former emits the result bundle the
-reporting tools consume (SPEC §2.1).
+Two workflows, both on **`macos-26`** rather than the `macos-15` first named
+here: the environment of record is macOS 26.5.2 / Xcode 26.6, and F-001 is the
+reason to care — two toolchains compiled the same source with different Swift
+versions and made a local green run and a red CI run irreconcilable.
+
+- ✅ **`pr.yml`** — push/PR gate. `xcodebuild`, not `swift test`, because only
+  the former emits the `.xcresult` the reporting layer consumes (F-003).
+  Records the runner's chip and OS as a first step, the CI analogue of stamping
+  every measurement with `HostEnvironment`. Reports skips as a first-class
+  number. `-retry-tests-on-failure` implements the §7 flake budget without a
+  test plan.
+- ✅ **`chip-differential.yml`** — *not a gate.* Runs the pinned experiments on
+  the runner's silicon and prints them beside the committed M4 Pro numbers.
+  This is the arm F-010 named and could not run: "confirming would need the
+  same script run on different silicon."
+- ⏳ **Neither has been observed running yet** — the repository is still
+  private, and the workflows are written against verified local behaviour
+  (`xcodebuild` invocation, `xcresulttool` summary schema, both inline report
+  scripts exercised against real JSON) rather than a green run. Treat the first
+  run as the experiment it is; the runner's chip is unknown until it reports.
+
+Deliberately **not** in the PR gate: every numeric threshold in the suite, for
+the reason in `TEST_STRATEGY.md` §6 and §8 gap 4.
 
 ---
 

@@ -27,8 +27,7 @@ writing code, and update them when a decision changes.
 
 Anything matching `docs/*.private.md`, plus `apple-ml-test-automation-playbook.md`,
 is personal and **gitignored**. Do not commit it, quote it, or copy its contents
-into a tracked file, and they must
-not be published. `docs/` is authoritative for all engineering decisions.
+into a tracked file. `docs/` is authoritative for all engineering decisions.
 
 ## Environment gotchas
 

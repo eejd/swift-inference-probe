@@ -284,6 +284,29 @@ GitHub Actions bills macOS at a **10× multiplier**, so the 2,000-minute free ti
 is ~200 real macOS minutes per month. That constraint, not preference, sets the
 split.
 
+**Corrected 5 Aug — the constraint above applies only while the repository is
+private.** GitHub's billing documentation states that Actions usage is free for
+public repositories on standard GitHub-hosted runners, macOS included. So the
+budget that this section says "sets the split" disappears the moment the repo is
+made public, which was scheduled for the same day.
+
+The split survives the correction, but **its justification changes entirely, and
+the replacement is stronger.** The real limit on what CI may run is not cost, it
+is validity:
+
+**Every threshold here is M4 Pro-derived (§4.4, §8 gap 4), and a GitHub runner
+is different silicon.** Running the compute-unit gates there would be asserting
+tolerances measured on one chip against another — precisely the error F-010
+spent a day establishing. So the PR gate is restricted to the checks that are
+*chip-independent*: build, comparison arithmetic, golden-fixture integrity, and
+harness behaviour. The model-dependent suites skip on a runner because the
+`.mlpackage` files are gitignored (F-011), and that skip is now a feature rather
+than an accident.
+
+The remaining budget question is trivial by comparison: a full `xcodebuild test`
+of this package takes **~15 seconds** locally, so the 5-minute PR target is not
+close to binding.
+
 ### PR gate — target <5 minutes
 
 Build · Swift Testing unit suite · parity on MobileNetV3 under `.cpuOnly` and
@@ -342,8 +365,15 @@ credible.
    `xcodebuild` CLI flags cover selection, retry, and parallelization, so the
    functional loss is small. The real loss is that configuration lives in
    workflow YAML instead of a committed, code-reviewable artifact (SPEC §2.1).
-4. **Single chip.** All thresholds are M4 Pro-derived. The per-chip override
-   mechanism exists but has one data point, so it is untested as a mechanism.
+4. **Single chip, and it bounds what CI can assert.** All thresholds are
+   M4 Pro-derived. The per-chip override mechanism exists but has one data
+   point, so it is untested as a mechanism. The consequence is concrete:
+   **cloud CI cannot gate the numerics**, because a GitHub runner is different
+   silicon and F-010 established that the chip is exactly the variable left
+   unexplained. The PR gate therefore asserts only chip-independent properties,
+   and `chip-differential.yml` runs the numeric experiments on a runner as an
+   *experiment* whose output is a second data point — never a gate. Closing this
+   gap properly needs a second machine of record, not more CI.
 5. **No performance baselines committed yet**, so the 10% regression gate is
    inactive until Day 5+.
 6. **Experimental API surface.** The comparator/validator/benchmarker utilities

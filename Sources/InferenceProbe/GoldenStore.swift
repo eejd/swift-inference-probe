@@ -31,7 +31,10 @@ public struct GoldenManifest: Codable, Sendable {
     public let producedBy: Provenance
     public let blessedAt: String
     public let reason: String
-    public let input: Tensor
+    /// Optional: a golden blessed from Swift records a *reference* for an input
+    /// that is managed elsewhere, so it legitimately has no input tensor of its
+    /// own. Only goldens written by `generate_goldens.py` carry a paired input.
+    public let input: Tensor?
     public let reference: Tensor
     /// Identity is the **weights**, never the `.mlpackage`: F-011 measured the
     /// package to carry fresh UUIDs and a date stamp on every export, so a
@@ -45,7 +48,8 @@ public struct GoldenManifest: Codable, Sendable {
 
 public struct Golden: Sendable {
     public let id: GoldenID
-    public let input: [Double]
+    /// `nil` for a reference-only golden — see `GoldenManifest.input`.
+    public let input: [Double]?
     public let reference: [Double]
     public let manifest: GoldenManifest
 }
@@ -121,8 +125,9 @@ public struct FileGoldenStore: GoldenStore {
         let manifest = try JSONDecoder().decode(
             GoldenManifest.self, from: Data(contentsOf: manifestURL))
 
-        let input = try readTensor(manifest.input,
-                                   from: inputsDirectory.appendingPathComponent(manifest.input.file))
+        let input = try manifest.input.map {
+            try readTensor($0, from: inputsDirectory.appendingPathComponent($0.file))
+        }
         let reference = try readTensor(manifest.reference,
                                        from: goldensDirectory.appendingPathComponent(manifest.reference.file))
         return Golden(id: id, input: input, reference: reference, manifest: manifest)
@@ -164,8 +169,7 @@ public struct FileGoldenStore: GoldenStore {
                               coremltools: nil, numpy: nil),
             blessedAt: ISO8601DateFormatter().string(from: Date()),
             reason: reason,
-            input: existing?.manifest.input
-                ?? .init(file: "", shape: [], dtype: "float32", sha256: ""),
+            input: existing?.manifest.input,
             reference: .init(file: tensorName,
                              shape: existing?.manifest.reference.shape ?? [actual.count],
                              dtype: "float32", sha256: bytes),

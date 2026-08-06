@@ -59,26 +59,20 @@ struct ParityTests {
 
     func predict(_ golden: Golden,
                  _ precision: ModelRunner.Precision) async throws -> [Double] {
+        // A parity golden must carry its input: comparing against a PyTorch
+        // reference computed on some *other* tensor is meaningless (F-015).
+        let input = try #require(golden.input,
+                                 "\(golden.id) is reference-only and cannot be used for parity")
         let runner = try await ModelRunner(modelURL: Fixtures.modelURL(precision),
                                            computeUnits: .cpuOnly)
-        return try runner.predict(golden.input,
+        return try runner.predict(input,
                                   inputName: Fixtures.inputName,
                                   outputName: Fixtures.outputName)
     }
 
-    @Test("every committed golden loads and verifies its digest")
-    func goldensLoad() throws {
-        let ids = store.availableIDs
-        #expect(!ids.isEmpty, "no goldens — run python/generate_goldens.py")
-        for id in ids {
-            // `load` throws on a digest or size mismatch, so this is the
-            // fixture-integrity check as well as a smoke test.
-            let golden = try store.load(id)
-            #expect(golden.input.count == 3 * 224 * 224)
-            #expect(golden.reference.count == Fixtures.classCount)
-            #expect(!golden.manifest.reason.isEmpty)
-        }
-    }
+    // Fixture integrity and provenance live in HarnessTests/GoldenStoreTests:
+    // they need no model, so they run on any machine including a CI runner
+    // where the gitignored .mlpackage files are absent.
 
     @Test("Core ML fp32 matches the PyTorch reference")
     func fp32Parity() async throws {

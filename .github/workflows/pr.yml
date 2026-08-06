@@ -1,0 +1,106 @@
+"on":
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+name: PR gate
+
+# One run per ref. A superseded run tells you nothing and costs a macOS minute.
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # macos-26 rather than the macos-15 the roadmap first named. The environment
+    # of record is macOS 26.5.2 / Xcode 26.6, and F-001 is the reason to care:
+    # two toolchains compiled the same source with different Swift versions and
+    # made a local green run and a red CI run irreconcilable. Matching the major
+    # version is the whole point of pinning a runner.
+    runs-on: macos-26
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every measurement in this project is stamped with the machine that
+      # produced it (SPEC §4.1). A CI run is a measurement, so it gets the same
+      # treatment — and this is the step that will tell us what silicon GitHub
+      # actually gives us, which matters for what the gate is allowed to assert.
+      - name: Record the host environment
+        run: |
+          {
+            echo "## Host environment"
+            echo
+            echo '| | |'
+            echo '|---|---|'
+            echo "| chip | \`$(sysctl -n machdep.cpu.brand_string)\` |"
+            echo "| arch | \`$(uname -m)\` |"
+            echo "| macOS | $(sw_vers -productVersion) ($(sw_vers -buildVersion)) |"
+            echo "| Xcode | $(xcodebuild -version | head -1) |"
+            echo "| Swift | $(swift --version 2>&1 | head -1) |"
+            echo
+            echo "> Thresholds in this suite are **M4 Pro-derived** (TEST_STRATEGY §4.4, §8 gap 4)."
+            echo "> If the chip above is not an M4 Pro, the numeric gates are running off-spec —"
+            echo "> see the note in the roadmap on why the model suites skip here."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # xcodebuild, not swift test: only the former emits the .xcresult that the
+      # whole reporting layer consumes (F-003, SPEC §2.1). The scheme is
+      # auto-named <PackageName>-Package — using <PackageName> fails with a
+      # message that blames the scheme argument (F-003).
+      #
+      # The full scheme is run rather than -only-testing:HarnessTests. The
+      # model-dependent suites skip themselves on a runner because the
+      # .mlpackage files are gitignored (F-011), and a visible skip carrying its
+      # regeneration command is more useful than silently not running them.
+      # -retry-tests-on-failure implements the flake budget from TEST_STRATEGY
+      # §7 without needing a test plan (F-003 verified these as CLI flags). A
+      # test that passes on retry still passes, but the retry is recorded in the
+      # bundle and a rising retry rate is the early warning.
+      - name: Test
+        run: |
+          xcodebuild test \
+            -scheme InferenceProbe-Package \
+            -destination 'platform=macOS' \
+            -resultBundlePath result.xcresult \
+            -retry-tests-on-failure -test-iterations 2
+
+      # The readable PR report SPEC §2.1 and TEST_STRATEGY §6 ask for. Skips are
+      # reported as a first-class number, not folded into "passed": on a runner
+      # they are the expected outcome for every model-dependent suite, and a
+      # gate that hides that is lying about its own coverage.
+      - name: Report
+        if: always()
+        run: |
+          xcrun xcresulttool get test-results summary \
+            --path result.xcresult --format json > summary.json 2>/dev/null || exit 0
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open("summary.json"))
+          print("\n## Test results\n")
+          print(f"**{d.get('result','?')}** — {d.get('environmentDescription','')}\n")
+          print("| total | passed | failed | skipped | expected failures |")
+          print("|---|---|---|---|---|")
+          print(f"| {d.get('totalTestCount',0)} | {d.get('passedTests',0)} | "
+                f"{d.get('failedTests',0)} | {d.get('skippedTests',0)} | "
+                f"{d.get('expectedFailures',0)} |")
+          failures = d.get("testFailures") or []
+          if failures:
+              print("\n### Failures\n")
+              for f in failures:
+                  print(f"- **{f.get('testName','?')}** — {f.get('failureText','')}")
+          if d.get("skippedTests"):
+              print("\n> Skips are expected here: the `.mlpackage` fixtures are "
+                    "gitignored (F-011), so every model-dependent suite skips on a "
+                    "cold runner. The skip message names the regeneration command.")
+          PY
+
+      - name: Upload result bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult
+          path: result.xcresult
+          retention-days: 14

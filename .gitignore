@@ -1,7 +1,6 @@
 # ── Never publish ────────────────────────────────────────────────────────
-# Personal working notes.
-# Kept on disk, never committed — and note that a file
-# committed once stays in history even if deleted later.
+# Personal working notes. Kept on disk, never committed — and note that a file
+# committed once stays in history even if it is deleted later.
 apple-ml-test-automation-playbook.md
 docs/*.private.md
 
