@@ -28,14 +28,19 @@ jobs:
       # produced it (SPEC §4.1). A CI run is a measurement, so it gets the same
       # treatment — and this is the step that will tell us what silicon GitHub
       # actually gives us, which matters for what the gate is allowed to assert.
+      # Written to stdout as well as the step summary. A summary is only
+      # readable in the web UI, and the chip is the single most useful fact a
+      # run reports — it decides which assertions are even valid here.
       - name: Record the host environment
         run: |
+          CHIP="$(sysctl -n machdep.cpu.brand_string)"
+          echo "RUNNER-CHIP: ${CHIP} / $(uname -m) / macOS $(sw_vers -productVersion) / $(xcodebuild -version | head -1)"
           {
             echo "## Host environment"
             echo
             echo '| | |'
             echo '|---|---|'
-            echo "| chip | \`$(sysctl -n machdep.cpu.brand_string)\` |"
+            echo "| chip | \`${CHIP}\` |"
             echo "| arch | \`$(uname -m)\` |"
             echo "| macOS | $(sw_vers -productVersion) ($(sw_vers -buildVersion)) |"
             echo "| Xcode | $(xcodebuild -version | head -1) |"

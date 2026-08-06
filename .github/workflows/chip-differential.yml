@@ -39,6 +39,7 @@ jobs:
 
       - name: Record the host environment
         run: |
+          echo "RUNNER-CHIP: $(sysctl -n machdep.cpu.brand_string) / $(uname -m) / macOS $(sw_vers -productVersion)"
           {
             echo "## Runner"
             echo
