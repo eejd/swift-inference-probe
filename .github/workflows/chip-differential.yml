@@ -64,12 +64,30 @@ jobs:
       # uninterpretable — the whole point is that only the chip differs.
       - name: Install pinned dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r python/requirements.txt
+          "$pythonLocation/bin/python" -m pip install --upgrade pip
+          "$pythonLocation/bin/python" -m pip install -r python/requirements.txt
+
+      # F-002 was "the default interpreter is not the one you think", found on
+      # the dev machine. The first run of this workflow hit the same class of
+      # problem in CI: pip installed into the hostedtoolcache Python while the
+      # warnings came from /Library/Frameworks, so which interpreter actually
+      # ran was ambiguous — and an ambiguous environment cannot attribute a
+      # crash to the chip. Every invocation below is now explicit, and this step
+      # records what is really loaded.
+      - name: Record the interpreter actually in use
+        run: |
+          "$pythonLocation/bin/python" - <<'PY'
+          import sys, torch, torchvision, coremltools, numpy
+          print("executable :", sys.executable)
+          print("version    :", sys.version.split()[0])
+          for m in (torch, torchvision, coremltools, numpy):
+              print(f"{m.__name__:12s}", m.__version__, m.__file__)
+          PY
 
       - name: Export the model
         working-directory: python
-        run: python export_model.py
+        run: |
+          "$pythonLocation/bin/python" export_model.py
 
       # Cheap and decisive: does this runner expose a Neural Engine at all?
       # F-014 measured 100% ANE residency at fp16 on the M4 Pro. A VM that
@@ -77,17 +95,19 @@ jobs:
       # bounds what any future gate here is allowed to claim.
       - name: Compute plan — is there a Neural Engine in this VM?
         working-directory: python
-        run: python compute_plan.py --out ../ci-results-compute-plan.json
+        run: |
+          "$pythonLocation/bin/python" compute_plan.py --out ../ci-results-compute-plan.json
 
       # The F-010 arm. .cpuOnly only, so it does not need the ANE.
       - name: Reproduce #2625 on this silicon
         working-directory: python
-        run: python repro_2625.py --n 50 --out ../ci-results-repro-2625.json
+        run: |
+          "$pythonLocation/bin/python" repro_2625.py --n 50 --out ../ci-results-repro-2625.json
 
       - name: Compute-unit differential
         working-directory: python
         run: |
-          python compute_unit_differential.py --n 50 --repeats 10 \
+          "$pythonLocation/bin/python" compute_unit_differential.py --n 50 --repeats 10 \
             --out ../ci-results-compute-unit.json
 
       # The payoff: the runner's numbers beside the committed M4 Pro ones.
