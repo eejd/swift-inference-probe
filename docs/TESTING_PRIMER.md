@@ -390,9 +390,84 @@ place that enforces it.
 **Knowing which assertion not to write is the same skill as knowing which one to
 write**, and it is only available to someone who measured first.
 
+### Step 12 — A gate has to be valid on the machine it runs on
+
+Continuous integration is usually treated as a deployment problem: get the suite
+running on a server. Here it was a *validity* problem, and the difference
+decided the whole design.
+
+Every threshold in this repository is **M4 Pro-derived**. A GitHub macOS runner
+is different silicon. Running the compute-unit gates there would assert
+tolerances measured on one chip against another — which is precisely the error
+Step 7 spent a day establishing. **A green run on the wrong hardware is worse
+than no run**, because it looks like evidence.
+
+So the gate was restricted to what is *chip-independent*: the build, the
+comparison arithmetic, golden-fixture integrity, and harness behaviour. The
+model-dependent suites skip, because the model files are deliberately
+untracked — and that skip stopped being an accident and became the design.
+
+Two consequences worth generalising.
+
+**Skips are a first-class outcome, reported separately from passes.** On a
+runner, "skipped" is the expected result for most of this suite. A report that
+folds skips into "passed" is lying about its own coverage, and the lie is
+invisible. The summary prints total / passed / failed / **skipped** as four
+numbers, and every skip message names the command that would un-skip it.
+
+**Ask what a suite is allowed to conclude, not just whether it runs green.**
+That question has a different answer in every environment, and almost nobody
+asks it.
+
+### Step 13 — Then use the same constraint as an instrument
+
+The chip that made CI invalid as a gate is exactly what makes it valuable as an
+experiment.
+
+F-010 closed two of three confounds and ended: *"confirming would need the same
+script run on an M1, which is the one thing this machine cannot provide."* A
+GitHub runner reports:
+
+```
+Apple M1 (Virtual) / arm64 / macOS 26.5.2 / Xcode 26.6
+```
+
+An M1 — the chip the upstream issue was filed on — with **macOS and Xcode
+matching the machine of record exactly**, so the chip is the only variable. The
+constraint and the opportunity are the same fact seen from two directions.
+
+That gets its own workflow, explicitly *not* a gate: nothing merges on its
+result, and its job is to print numbers beside the committed ones. **Separate
+what blocks a merge from what produces knowledge.** Conflating them is how
+experiments end up either blocking work or never being run.
+
+### Step 14 — Publishing is not the same as pushing
+
+Before the repository went public, an audit for anything that should not be
+published turned up two comment lines describing what the *gitignored* personal
+files contained.
+
+Deleting them from the working tree is not enough. **Git history is part of what
+you publish**, and the phrasing sat in 17 of 18 commits. Anyone could
+`git log -p .gitignore` and read it.
+
+The `.gitignore` comment had itself said *"a file committed once stays in
+history even if deleted later."* It was right, and it was describing itself.
+
+The fix was a history rewrite scrubbing those lines from every commit,
+verified by re-cloning **from the remote** and searching all 19 commits for a
+match — checking the local copy would have proved nothing about what was
+actually served. The commit-by-commit narrative survived, which mattered: the
+history here *is* documentation, F-001 through F-016 in order.
+
+Generalising: **an irreversible outward-facing action deserves a checklist and a
+verification step, not just a command.** Publication, deletion, and force-push
+share that shape. And the check belongs against the artifact as consumers will
+receive it, not against your copy.
+
 ---
 
-## 4. Eight lessons that generalise
+## 4. Ten lessons that generalise
 
 ### 4.1 Choosing the metric *is* the test design
 
@@ -516,6 +591,49 @@ because these fixtures exist for *exactness*, not for coverage.
 **Whenever a contract crosses a boundary — two languages, two machines, two
 teams — the artifact is the contract, and a recipe for regenerating it is not.**
 
+### 4.9 A fix is a claim about a configuration, not a fact
+
+§4.2 says thresholds are chip-specific. **So are workarounds**, and that is much
+less obvious.
+
+F-005 was a native crash: `ct.convert()` segfaults if a `predict()` has run in
+the same process. It was bisected, root-caused to GIL mishandling, and fixed
+with `skip_model_load=True`. That fix held on the M4 Pro through every run for
+four days. It reads, in the notes, like a solved problem.
+
+On the M1 runner — same coremltools, same torch, same macOS, same Xcode, only
+the chip different — **the identical sequence segfaults again** (F-016). The
+workaround does not hold there.
+
+The lesson is not "that fix was wrong." It is that *"fixed"* was always shorthand
+for *"fixed on the configuration I tested."* Everyone knows to scope a
+measurement to its environment and almost nobody scopes a **fix** to one. A
+bug-fix note that does not say where it was verified is making a broader claim
+than its evidence supports.
+
+The practical upshot is cheap: write the configuration next to the fix, the same
+way you write it next to a threshold.
+
+### 4.10 Re-check the premises your design rests on
+
+`TEST_STRATEGY.md` §6 justified this project's entire PR-versus-nightly split
+with a cost argument: macOS runners bill at a 10× multiplier, leaving ~200 free
+minutes a month, and *"that constraint, not preference, sets the split."*
+
+Checking it against the billing documentation on the day the split was
+implemented: the multiplier applies to **private** repositories. Public ones get
+standard runners free — and making the repository public was on the same day's
+plan. The constraint that shaped the design would have evaporated hours later.
+
+The split survived, but on a completely different and stronger justification —
+validity rather than cost (Step 12). That is the useful part: **a design whose
+stated reason turns out to be wrong is not automatically a wrong design, but you
+do not know which until you check.**
+
+Premises age. The ones most worth re-checking are the ones written down
+confidently enough that nobody thinks to question them — *"that constraint, not
+preference, sets the split"* is exactly the tone that stops re-examination.
+
 ---
 
 ## 5. Vocabulary
@@ -541,3 +659,6 @@ teams — the artifact is the contract, and a recipe for regenerating it is not.
 | **Quarantine** | Keeping a known-bad test running and reporting without failing the build |
 | **Test validity** | Whether a test measures what it claims to measure |
 | **Bisection** | Narrowing a failure by varying one factor at a time |
+| **Gate vs. instrument** | A gate blocks a merge; an instrument produces knowledge. The same run can be valid as one and not the other |
+| **Skip** | A test that did not run. A first-class outcome — folding skips into "passed" hides missing coverage |
+| **Environment confound** | Ambiguity about which toolchain or interpreter actually ran; must be closed before attributing a failure to anything else |
