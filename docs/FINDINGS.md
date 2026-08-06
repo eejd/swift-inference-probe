@@ -3,14 +3,15 @@
 Every real discrepancy the harness caught, with the layer, the magnitude, the
 compute path, and a judgement on whether it is acceptable.
 
-**As of 4 Aug 2026 the repository has fifteen findings.** F-001–F-004 establish
+**As of 5 Aug 2026 the repository has sixteen findings.** F-001–F-004 establish
 the toolchain and runner, F-005 isolates a coremltools native crash, F-006–F-010
 record the fp16 and compute-unit experiments, F-011 establishes that those
 experiments reproduce byte-for-byte from a fresh export, F-012 localizes both
 the precision and compute-unit divergence to a specific op, F-013 shows the
 NaN/Inf gate is blind to the failure mode that actually occurs, F-014 reads
-dispatch off the compute plan and confirms the inference F-007 left open, and
-F-015 puts the NaN sanitization in Core ML rather than in coremltools. The
+dispatch off the compute plan and confirms the inference F-007 left open, F-015
+puts the NaN sanitization in Core ML rather than in coremltools, and F-016 runs
+the suite on a second chip in CI and finds F-005's workaround failing there. The
 Python experiments all run with their result JSON committed, and the Swift
 harness now covers the compute-unit differential and the robustness battery.
 
@@ -920,6 +921,81 @@ full unit matrix in Swift.
 
 ---
 
+## F-016 · F-005's workaround holds on M4 Pro and fails on M1
+
+**Two runs on a GitHub `macos-26` runner**, `.github/workflows/chip-differential.yml`.
+
+`chip-differential.yml` exists to run the arm F-010 called impossible here:
+*"confirming would need the same script run on an M1, which is the one thing
+this machine cannot provide."* A GitHub macOS runner reports:
+
+```
+Apple M1 (Virtual) / arm64 / macOS 26.5.2 / Xcode 26.6
+```
+
+**macOS and Xcode match the machine of record exactly**, so against the M4 Pro
+this is a single-variable comparison. The variable is the chip.
+
+**What reproduced, bit for bit.** Before the crash, the export got far enough to
+emit two numbers, and both are identical to the M4 Pro values in F-006:
+
+| Quantity | M4 Pro | M1 runner |
+|---|---|---|
+| PyTorch fp16 baseline L1 | 0.006337 | **0.006337** |
+| Core ML **fp32** vs PyTorch, L1 | 0.000002 | **0.000002** |
+| Core ML fp32 max abs | 0.000010 | **0.000010** |
+| top-1 on the seeded input | 111 | **111** |
+
+So the fp32 conversion path and the PyTorch reference are **chip-independent**.
+Whatever the chip explains, it is not those.
+
+**What crashed.** `converting fp16 ...` → **`Segmentation fault: 11`, exit 139**,
+inside `ct.convert()`'s MIL default pipeline, at roughly the halfway point.
+Reproduced on both runs.
+
+The sequence that reaches it is exactly row 5 of F-005's bisection table:
+`convert(fp32)` → `save` → `load` → **`predict`** → `convert(fp16)`.
+
+**Judgement.** **`skip_model_load=True` is not a sufficient workaround on M1.**
+F-005 established that `ct.convert()` crashes if a `predict()` has run in the
+same process, root-caused it to GIL mishandling in coremltools' native
+extension, and worked around it by suppressing the implicit model load. That
+workaround has held on the M4 Pro through every run since. On M1 — **same
+coremltools 9.0, same torch 2.13.0, same macOS 26.5.2, same Xcode 26.6, only
+the chip different** — the crash returns.
+
+Two consequences.
+
+**1. The upstream report gets stronger and more specific.** F-005 was already
+reportable. It can now say the defect survives the documented workaround on M1
+while that workaround suffices on M4 Pro, which points at something
+chip-dependent in the native extension rather than at a uniform GIL bug. That is
+a much sharper bug report, and #2625's reporter was on M1 hardware.
+
+**2. F-010's remaining confound is blocked by F-005 on precisely the chip it
+needs.** The fp16 `.mlpackage` cannot be produced on M1 in a single process, so
+the fp16 ratio — the number the whole investigation turns on — is still
+unmeasured on a second chip. The fix is mechanical rather than conceptual:
+export one precision per process, which sidesteps the interaction entirely.
+Until that lands, **F-010's chip/OS confound remains open**, and this finding
+narrows rather than closes it.
+
+**An environment confound, named and closed.** The first run's log showed pip
+targeting `hostedtoolcache` while every warning came from
+`/Library/Frameworks` — F-002's "the interpreter is not the one you think",
+recurring in CI. An ambiguous environment cannot attribute a crash to a chip, so
+the workflow now pins `"$pythonLocation/bin/python"` everywhere and prints
+`sys.executable` with the resolved path of every relevant module. The answer was
+that there was no mismatch: `pythonLocation` resolves *to* the framework Python
+and torch sits in that same prefix. The crash is not an environment artifact.
+
+**Caveat.** "Apple M1 (Virtual)" is a VM under Apple's Virtualization Framework,
+not bare metal. A hypervisor is a difference from the M4 Pro beyond the chip,
+and it is not ruled out as the cause. Whether the runner exposes a Neural Engine
+at all is still unknown, because the run never reached `compute_plan.py`.
+
+---
+
 ## Investigation status
 
 Each investigation resolves to a finding entry, including negative results.
@@ -928,7 +1004,7 @@ finding, especially when the upstream report claims hardware dependence.
 
 | # | Question | Status |
 |---|---|---|
-| 1 | Does #2625's fp16 L1 drift (0.0394 vs. 0.0165) reproduce on M4 Pro / macOS 26.5.2? | **Characterized** — direction yes, magnitude no; two confounds eliminated (F-006, F-009, F-010) |
+| 1 | Does #2625's fp16 L1 drift (0.0394 vs. 0.0165) reproduce on M4 Pro / macOS 26.5.2? | **Characterized, chip arm blocked** — direction yes, magnitude no; input distribution and torch version eliminated (F-006, F-009, F-010). The M1 arm now runs in CI but cannot export fp16 there (F-016), so chip/OS stays open |
 | 2 | What fraction of inputs disagree between `.cpuOnly` and `.cpuAndNeuralEngine`, and by how much? | **Complete** — 3/200 top-1 flips on synthetic inputs, with the full distribution in F-008 |
 | 3 | Where does `MLModelComparator` op localization stabilize under an `atol` sweep? | **Complete** — two plateaus per arm; both arms agree on `conv:input_3` over `atol` 1e-3–1e-2, and the tolerance is shown to control search depth (F-012) |
 | 4 | Run-to-run variance on a fixed input, per compute unit | **Complete** — zero maximum spread across 20 repeats/unit (F-008) |
