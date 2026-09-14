@@ -972,13 +972,18 @@ while that workaround suffices on M4 Pro, which points at something
 chip-dependent in the native extension rather than at a uniform GIL bug. That is
 a much sharper bug report, and #2625's reporter was on M1 hardware.
 
-**2. F-010's remaining confound is blocked by F-005 on precisely the chip it
-needs.** The fp16 `.mlpackage` cannot be produced on M1 in a single process, so
-the fp16 ratio — the number the whole investigation turns on — is still
+**2. F-010's remaining confound was blocked by F-005 on precisely the chip it
+needs.** The fp16 `.mlpackage` could not be produced on M1 in a single process, so
+the fp16 ratio — the number the whole investigation turns on — was temporarily
 unmeasured on a second chip. The fix is mechanical rather than conceptual:
 export one precision per process, which sidesteps the interaction entirely.
-Until that lands, **F-010's chip/OS confound remains open**, and this finding
-narrows rather than closes it.
+
+**Resolution: worked around** in `python/export_model.py` by isolating each precision
+export to its own process. Invoking `export_model.py` (or `--precision both`) now
+dispatches `fp32` and `fp16` in separate subprocesses, each running `convert()` →
+`save()` → `predict()` in isolation before terminating. No process ever invokes
+`convert()` after `predict()`, eliminating the native GIL crash on M1 and unblocking
+the CI workflow.
 
 **An environment confound, named and closed.** The first run's log showed pip
 targeting `hostedtoolcache` while every warning came from
@@ -1004,7 +1009,7 @@ finding, especially when the upstream report claims hardware dependence.
 
 | # | Question | Status |
 |---|---|---|
-| 1 | Does #2625's fp16 L1 drift (0.0394 vs. 0.0165) reproduce on M4 Pro / macOS 26.5.2? | **Characterized, chip arm blocked** — direction yes, magnitude no; input distribution and torch version eliminated (F-006, F-009, F-010). The M1 arm now runs in CI but cannot export fp16 there (F-016), so chip/OS stays open |
+| 1 | Does #2625's fp16 L1 drift (0.0394 vs. 0.0165) reproduce on M4 Pro / macOS 26.5.2? | **Characterized** — direction yes, magnitude no; input distribution and torch version eliminated (F-006, F-009, F-010). The M1 arm runs in CI via per-process export (F-016) |
 | 2 | What fraction of inputs disagree between `.cpuOnly` and `.cpuAndNeuralEngine`, and by how much? | **Complete** — 3/200 top-1 flips on synthetic inputs, with the full distribution in F-008 |
 | 3 | Where does `MLModelComparator` op localization stabilize under an `atol` sweep? | **Complete** — two plateaus per arm; both arms agree on `conv:input_3` over `atol` 1e-3–1e-2, and the tolerance is shown to control search depth (F-012) |
 | 4 | Run-to-run variance on a fixed input, per compute unit | **Complete** — zero maximum spread across 20 repeats/unit (F-008) |

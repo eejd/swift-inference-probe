@@ -11,7 +11,8 @@ the host chip. A drift number without that context is not interpretable
 (docs/TEST_STRATEGY.md 4.4).
 
 Usage:
-    python export_model.py                     # MobileNetV3-Large
+    python export_model.py                     # MobileNetV3-Large (both fp32 + fp16)
+    python export_model.py --precision fp16    # single precision
     python export_model.py --model resnet18 --output-dir ../Fixtures/models
 """
 
@@ -23,6 +24,7 @@ import json
 import platform
 import subprocess
 import sys
+import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -152,15 +154,7 @@ def drift(reference: np.ndarray, actual: np.ndarray) -> dict:
     }
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--model", default="mobilenet_v3_large")
-    ap.add_argument("--output-dir", default=str(FIXTURES))
-    args = ap.parse_args()
-
-    out = Path(args.output_dir).resolve()
-    out.mkdir(parents=True, exist_ok=True)
-
+def export_single_precision(args, precision: str, out: Path) -> dict:
     torch.manual_seed(SEED)
     sample = (torch.rand(*INPUT_SHAPE) - IMAGENET_MEAN) / IMAGENET_STD
 
@@ -176,56 +170,114 @@ def main() -> int:
     # the *excess* over this baseline is attributable to the conversion.
     # Issue #2625 reports Core ML 0.0394 against this baseline's 0.0165 (~2.4x).
     torch_fp16_stats = None
-    try:
-        with torch.no_grad():
-            half = copy.deepcopy(model).half()
-            torch_fp16 = half(sample.half()).float().numpy()
-        torch_fp16_stats = drift(reference, torch_fp16)
-        print(f"pytorch fp16 baseline:  l1_mean={torch_fp16_stats['l1_mean']:.6f}")
-    except Exception as exc:  # fp16 CPU support is uneven across torch versions
-        print(f"pytorch fp16 baseline unavailable: {exc}")
+    if precision == "fp16":
+        try:
+            with torch.no_grad():
+                half = copy.deepcopy(model).half()
+                torch_fp16 = half(sample.half()).float().numpy()
+            torch_fp16_stats = drift(reference, torch_fp16)
+            print(f"pytorch fp16 baseline:  l1_mean={torch_fp16_stats['l1_mean']:.6f}")
+        except Exception as exc:  # fp16 CPU support is uneven across torch versions
+            print(f"pytorch fp16 baseline unavailable: {exc}")
 
     traced = torch.jit.trace(model, sample)
 
-    results: dict[str, dict] = {}
-    for precision in ("fp32", "fp16"):
-        print(f"\nconverting {precision} ...")
-        mlmodel = convert(traced, precision, sample)
+    print(f"\nconverting {precision} ...")
+    mlmodel = convert(traced, precision, sample)
 
-        path = out / f"{args.model}.{precision}.mlpackage"
-        mlmodel.save(str(path))
+    path = out / f"{args.model}.{precision}.mlpackage"
+    mlmodel.save(str(path))
 
-        manifest = Manifest(
-            model=args.model,
-            weights=weights,
-            precision=precision,
-            input_shape=list(INPUT_SHAPE),
-            seed=SEED,
-            chip=host_chip(),
-            macos=platform.mac_ver()[0],
-            python=sys.version.split()[0],
-            torch=torch.__version__,
-            torchvision=torchvision.__version__,
-            coremltools=ct.__version__,
-            numpy=np.__version__,
-            exported_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        )
-        (out / f"{args.model}.{precision}.manifest.json").write_text(
-            json.dumps(asdict(manifest), indent=2) + "\n"
-        )
+    manifest = Manifest(
+        model=args.model,
+        weights=weights,
+        precision=precision,
+        input_shape=list(INPUT_SHAPE),
+        seed=SEED,
+        chip=host_chip(),
+        macos=platform.mac_ver()[0],
+        python=sys.version.split()[0],
+        torch=torch.__version__,
+        torchvision=torchvision.__version__,
+        coremltools=ct.__version__,
+        numpy=np.__version__,
+        exported_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    )
+    (out / f"{args.model}.{precision}.manifest.json").write_text(
+        json.dumps(asdict(manifest), indent=2) + "\n"
+    )
 
-        # .cpuOnly is the deterministic reference path (docs/SPEC.md 2.3).
-        # Reloading with an explicit compute unit rather than trusting the
-        # default keeps this prediction reproducible.
-        cpu_model = ct.models.MLModel(str(path), compute_units=ct.ComputeUnit.CPU_ONLY)
-        out_dict = cpu_model.predict({INPUT_NAME: sample.numpy()})
-        actual = np.asarray(next(iter(out_dict.values())))
+    # .cpuOnly is the deterministic reference path (docs/SPEC.md 2.3).
+    # Reloading with an explicit compute unit rather than trusting the
+    # default keeps this prediction reproducible.
+    cpu_model = ct.models.MLModel(str(path), compute_units=ct.ComputeUnit.CPU_ONLY)
+    out_dict = cpu_model.predict({INPUT_NAME: sample.numpy()})
+    actual = np.asarray(next(iter(out_dict.values())))
 
-        stats = drift(reference, actual)
-        results[precision] = stats
-        print(f"  saved {path.name}")
-        print(f"  l1_mean={stats['l1_mean']:.6f}  max_abs={stats['max_abs']:.6f}  "
-              f"cos={stats['cosine_similarity']:.6f}  top1_agrees={stats['top1_agrees']}")
+    stats = drift(reference, actual)
+    print(f"  saved {path.name}")
+    print(f"  l1_mean={stats['l1_mean']:.6f}  max_abs={stats['max_abs']:.6f}  "
+          f"cos={stats['cosine_similarity']:.6f}  top1_agrees={stats['top1_agrees']}")
+
+    return {
+        "stats": stats,
+        "torch_fp16_stats": torch_fp16_stats,
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--model", default="mobilenet_v3_large")
+    ap.add_argument("--output-dir", default=str(FIXTURES))
+    ap.add_argument(
+        "--precision",
+        choices=["both", "fp32", "fp16"],
+        default="both",
+        help="precision to export; 'both' runs each precision in an isolated subprocess (F-005, F-016)",
+    )
+    ap.add_argument("--stats-out", default=None, help=argparse.SUPPRESS)
+    args = ap.parse_args()
+
+    out = Path(args.output_dir).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+
+    if args.precision != "both":
+        result = export_single_precision(args, args.precision, out)
+        if args.stats_out:
+            Path(args.stats_out).write_text(json.dumps(result, indent=2) + "\n")
+        return 0
+
+    # F-005 + F-016: ct.convert() segfaults if predict() has run in the same process.
+    # On M4 Pro skip_model_load=True sufficed; on M1 it does not. Running each
+    # precision in an isolated subprocess guarantees no predict() precedes convert().
+    with tempfile.TemporaryDirectory(prefix="inferenceprobe-export-") as tmpdir:
+        tmp_path = Path(tmpdir)
+        stats_files = {}
+        for p in ("fp32", "fp16"):
+            s_file = tmp_path / f"{p}.json"
+            stats_files[p] = s_file
+            cmd = [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "--precision",
+                p,
+                "--model",
+                args.model,
+                "--output-dir",
+                str(out),
+                "--stats-out",
+                str(s_file),
+            ]
+            subprocess.run(cmd, check=True)
+
+        res_fp32 = json.loads(stats_files["fp32"].read_text())
+        res_fp16 = json.loads(stats_files["fp16"].read_text())
+
+    results = {
+        "fp32": res_fp32["stats"],
+        "fp16": res_fp16["stats"],
+    }
+    torch_fp16_stats = res_fp16.get("torch_fp16_stats")
 
     # The comparison that matters. Dividing Core ML fp16 drift by Core ML *fp32*
     # drift is meaningless — the fp32 denominator is float noise, so the ratio
